@@ -1,50 +1,164 @@
 # ASD Multimodal Detection Framework
 
-> **Multimodal Autism Spectrum Disorder Detection via Functional MRI and Phenotypic Genetics**
+> **Multimodal Autism Spectrum Disorder Detection via Functional Connectivity and Phenotypic Features**
 >
 > Targeting IEEE EMBC / ISBI / BIBM or *Transactions on Neural Systems and Rehabilitation Engineering*
 
 ---
 
+## Quick Start — New Collaborators
+
+**Prerequisites:** Python 3.10+, a CUDA-capable GPU (4 GB+ VRAM), internet connection.
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/tareqsujat-cmd/ASD-forever.git
+cd ASD-forever
+
+# 2. Run the one-command bootstrap
+python setup.py
+```
+
+`setup.py` automates everything:
+
+| Step | What it does |
+|------|-------------|
+| 1 | Checks Python ≥ 3.10 |
+| 2 | Detects your CUDA version via `nvidia-smi` |
+| 3 | Creates a `.venv/` virtual environment |
+| 4 | Installs PyTorch with the correct CUDA build (cu118 / cu121 / cu124 / cu126) |
+| 5 | Installs all dependencies from `requirements.txt` |
+| 6 | Downloads and preprocesses ABIDE I — ~340 MB download, ~80 MB stored on disk |
+| 7 | Runs a 2-minute smoke test on synthetic data to confirm everything works |
+
+When it finishes, activate the environment and run the full experiment:
+
+```bash
+# Windows
+.venv\Scripts\activate
+
+# Linux / Mac
+source .venv/bin/activate
+
+# Full training run  (~50–60 min on a GTX 1650 / RTX 3060)
+python run_experiment.py \
+    --real_data \
+    --mri_dir ./abide_processed/mri \
+    --gen_dir ./abide_processed/gen \
+    --max_epochs 100 \
+    --n_folds 5 \
+    --skip_profile \
+    --n_hpo_trials 10
+
+# Generate performance plots after training
+python results/generate_plots.py
+```
+
+**Optional flags for `setup.py`:**
+
+```
+--skip-data     abide_processed/ already exists — skip the download
+--skip-smoke    Skip the 2-min smoke test
+--cpu-only      No GPU available (training will be ~10x slower)
+--no-venv       Install into your current Python instead of creating .venv/
+```
+
+> For a full explanation of the project, dataset, and what the model actually
+> processes, read **[GETTING_STARTED.md](GETTING_STARTED.md)**.
+
+---
+
 ## Overview
 
-A complete, reproducible, publication-ready framework for ASD detection that fuses resting-state fMRI features with phenotypic/genetic features through a **Cross-Modal Attention** mechanism.  All 12 modules are fully implemented, tested, and wired end-to-end.
+A complete, reproducible pipeline for binary ASD / TC classification that fuses
+two input streams through a **Cross-Modal Attention** layer:
 
-**Key claim:** Cross-modal attention fusion between a 3D MRI encoder and a Transformer genetics encoder outperforms every single-modality baseline and simpler fusion strategies (concatenation, gating, late fusion) on ABIDE I, with generalisation confirmed on the held-out ABIDE II cohort.
+| Stream | Input | Dimension |
+|--------|-------|-----------|
+| "MRI" branch | Functional connectivity vector (CC200 atlas, ABIDE I) | 19,900 floats |
+| "Genetics" branch | Phenotypic proxy features (age, sex, IQ scores) | 6 floats |
+
+> **Note on the "MRI" branch:** The model does **not** process raw brain scans.
+> It processes a *functional connectivity* (FC) vector — the upper triangle of
+> the 200×200 ROI-to-ROI Pearson correlation matrix computed from resting-state
+> fMRI.  This 19,900-element vector is zero-padded to 28³ and reshaped to
+> `(1, 28, 28, 28)` to match the 3D ResNet backbone's expected input shape.
+> See [GETTING_STARTED.md](GETTING_STARTED.md) for a full explanation.
 
 ---
 
 ## Architecture
 
 ```
-Resting-state fMRI (96×96×96)
-        │
-  ┌─────▼──────────────────────────┐
-  │  MRI Encoder                   │
-  │  ResNet3D / DenseNet3D /        │
-  │  SwinTransformer3D / ConvNeXt3D│
-  │  + SEBlock3D attention          │
-  └─────────────────┬──────────────┘
-                    │ f_mri (d=256)
-                    │
-Phenotypic / Gene expression (256-D PCA)
-        │
-  ┌─────▼──────────────────────────┐
-  │  Genetics Encoder              │
-  │  TransformerEncoder / TabNet / │
-  │  GNNEncoder                    │
-  └─────────────────┬──────────────┘
-                    │ f_gen (d=256)
-                    │
-  ┌─────────────────▼──────────────┐
-  │  Multimodal Fusion             │
-  │  CrossAttention  ←  (novel)    │
-  │  (also: Gated, Intermediate,   │
-  │   Late, Dynamic ablations)     │
-  └─────────────────┬──────────────┘
-                    │
-              ASD / TC logit
+Resting-state fMRI  →  CC200 atlas parcellation  →  200×200 FC matrix
+                                                            │
+                                        upper triangle  (19,900 floats)
+                                        zero-pad  →  (21,952 = 28³)
+                                        reshape   →  (1, 28, 28, 28)
+                                                            │
+                                              ┌─────────────▼──────────┐
+                                              │  MRI Encoder (3D ResNet)│
+                                              │  47.2M params           │
+                                              └─────────────┬──────────┘
+                                                            │ f_mri (d=256)
+
+Phenotypic features: age, sex, FIQ, VIQ, PIQ, site  (6 floats)
+                                                            │
+                                              ┌─────────────▼──────────┐
+                                              │  Genetics Encoder       │
+                                              │  Transformer, 3.26M p   │
+                                              │  4 layers · 8 heads     │
+                                              └─────────────┬──────────┘
+                                                            │ f_gen (d=256)
+
+                                              ┌─────────────▼──────────┐
+                                              │  CrossAttentionFusion   │  ← novel
+                                              │  11M params             │
+                                              │  4 tokens · 2 layers    │
+                                              └─────────────┬──────────┘
+                                                            │
+                                                     ASD / TC logit
+
+Total parameters: ~61.5M
+Loss:             FocalLoss (α=0.25, γ=2.0, label smoothing=0.10)
+Optimizer:        AdamW + cosine warmup (lr=1e-4, wd=1e-5)
+Training:         5-fold CV · AMP · gradient accumulation · EMA
 ```
+
+---
+
+## Dataset — ABIDE I
+
+| Property | Value |
+|----------|-------|
+| Subjects (after QC) | **1,100** — 530 ASD / 570 TC |
+| Acquisition sites | 20 independent sites |
+| Preprocessing pipeline | CPAC |
+| Brain atlas | CC200 (200 cortical ROIs) |
+| Processed data size | ~80 MB total |
+| Access | Free, no registration required |
+
+Data is downloaded automatically by `setup.py` / `prepare_abide.py` via
+`nilearn`.  No manual registration or sign-up required.
+
+---
+
+## Results (latest run)
+
+| Metric | Value | 95% CI |
+|--------|-------|--------|
+| **AUROC** | **0.7110** | [0.685 – 0.744] |
+| AUPRC | 0.6797 | — |
+| Accuracy | 67.8% | — |
+| Sensitivity (ASD recall) | 64.3% | — |
+| Specificity (TC recall) | 71.1% | — |
+| F1 | 0.658 | — |
+| MCC | 0.355 | — |
+| ECE (calibration error) | 0.110 | — |
+
+Per-fold best AUCs (5-fold CV): 0.695 · 0.703 · 0.739 · 0.765 · 0.717
+
+HPO best: AUROC=0.7187, `lr=7.3e-4`, `fusion=late`, `batch_size=32`
 
 ---
 
@@ -52,211 +166,58 @@ Phenotypic / Gene expression (256-D PCA)
 
 ```
 ASD_forever/
-├── configs/
-│   ├── config.yaml              Master configuration (all hyperparameters)
-│   └── config_schema.py         Type-safe Python dataclass schema
+├── setup.py                 ← START HERE — one-command bootstrap
+├── GETTING_STARTED.md       ← full onboarding guide for new collaborators
 │
-├── preprocessing/
-│   ├── mri/                     NIfTI I/O, resampling, normalisation, QC,
-│   │                            skull stripping, bias correction, registration
-│   └── genetics/                Imputation, ComBat, feature selection,
-│                                PCA/VAE, gene graph builder
+├── run_experiment.py        End-to-end pipeline (all 8 stages)
+├── prepare_abide.py         Download + preprocess ABIDE I or II
+├── predict.py               Single-subject inference from checkpoint
+│
+├── configs/
+│   ├── config.yaml          All hyperparameters (master config)
+│   └── config_schema.py     Type-safe dataclass schema
+│
+├── data/
+│   └── abide_dataset.py     Dataset class — FC vector → 28³ reshape logic
 │
 ├── models/
-│   ├── mri/                     ResNet3D, DenseNet3D, SwinTransformer3D,
-│   │                            ConvNeXt3D, MRIEncoder, SEBlock3D
-│   ├── genetics/                GeneTransformerEncoder, TabNet, GNNEncoder,
-│   │                            GeneticsEncoder
-│   └── fusion/                  CrossAttention, Gated, Intermediate,
-│                                Late, Dynamic + MultiModalFusion
+│   ├── mri/                 ResNet3D encoder + SEBlock3D
+│   ├── genetics/            GeneTransformerEncoder
+│   └── fusion/              CrossAttention, Gated, Late, Dynamic variants
 │
 ├── training/
-│   │   FocalLoss, AdamW param groups, cosine warmup,
-│   │   ModelEMA, EarlyStopping, CheckpointManager,
-│   └── ASDTrainer (AMP + grad accumulation + K-fold CV)
+│   │   FocalLoss · AdamW · cosine warmup · ModelEMA · EarlyStopping
+│   └── ASDTrainer           AMP + gradient accumulation + K-fold CV
 │
-├── evaluation/                  Full metric suite (AUC, F1, MCC, Brier…),
-│                                bootstrap CI, DeLong, McNemar, Wilcoxon,
-│                                calibration, per-site breakdown
+├── evaluation/              AUC/F1/MCC/Brier + bootstrap CI, calibration,
+│                            per-site breakdown, DeLong / McNemar tests
 │
-├── explainability/              GradCAM3D, GradCAM++3D, IntegratedGradients,
-│                                SmoothGrad, AttentionRollout,
-│                                GeneticsFeatureImportance, ExplainabilityEngine
+├── hyperparameter_tuning/   Optuna 4.x — TPE/CMA-ES, fANOVA importance
 │
-├── ablation/                    AblationStudy (OFAT / factorial / custom),
-│                                AblationRunner, AblationAnalyzer,
-│                                Wilcoxon significance, LaTeX/markdown reports
+├── ablation/                OFAT / factorial ablation runner
 │
-├── hyperparameter_tuning/       Optuna 4.x — TPE / CMA-ES / NSGA-II,
-│                                MedianPruner / HyperbandPruner,
-│                                fANOVA importance, TuningAnalyzer
+├── explainability/          GradCAM3D, IntegratedGradients, AttentionRollout
 │
-├── visualization/               IEEE-format figures: ROC/PR + CI bands,
-│                                confusion matrix, calibration, t-SNE/UMAP,
-│                                MRI saliency triplets, gene importance
+├── visualization/           IEEE-format figures
 │
-├── paper/                       PaperFigureGenerator — all 9 camera-ready
-│                                figures (PDF + PNG) + LaTeX manifest
+├── results/
+│   ├── evaluation/          evaluation_report.json (metrics + CIs)
+│   ├── hpo/                 hpo_best_trial.json
+│   ├── training/checkpoints/ top-k model checkpoints per fold
+│   └── plots/               generated by results/generate_plots.py
 │
-├── tests/                       Pytest suite — 549 tests total, all passing
-│
-├── prepare_abide.py             Download + preprocess ABIDE I or II
-├── run_experiment.py            End-to-end pipeline (all 8 stages)
-├── predict.py                   Single-subject inference from checkpoint
 ├── requirements.txt
 └── environment.yml
 ```
 
 ---
 
-## Quick Start
-
-### 1 — Environment
-
-```bash
-# Conda (recommended)
-conda env create -f environment.yml
-conda activate asd-detection
-
-# Or pip
-pip install -r requirements.txt
-
-# GPU build (replace cu118 with your CUDA version)
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
-pip install -r requirements.txt
-```
-
-### 2 — Smoke test (no data download required, ~2 min on CPU)
-
-```bash
-python run_experiment.py
-```
-
-This runs all 8 pipeline stages on 40 synthetic subjects and writes results to `results/smoke_test/`.
-
-### 3 — Prepare ABIDE I (training corpus, ~8 GB download)
-
-```bash
-python prepare_abide.py \
-    --dataset abide1 \
-    --out_dir datasets/abide1
-```
-
-### 4 — Prepare ABIDE II (held-out external test set, ~9 GB download)
-
-```bash
-python prepare_abide.py \
-    --dataset abide2 \
-    --role held_out \
-    --abide1_dir datasets/abide1 \
-    --out_dir datasets/abide2
-```
-
-The `--abide1_dir` flag loads the ABIDE I fitted intensity normaliser and applies it to ABIDE II without re-fitting, preventing data leakage.
-
-### 5 — Full experiment
-
-```bash
-python run_experiment.py \
-    --real_data \
-    --mri_dir datasets/abide1/mri \
-    --gen_dir  datasets/abide1/genetics \
-    --held_out_mri_dir datasets/abide2/mri \
-    --held_out_gen_dir datasets/abide2/genetics \
-    --n_folds 5 \
-    --max_epochs 100 \
-    --out_dir results/full_run
-```
-
-### 6 — Inference on a new subject
-
-```bash
-python predict.py \
-    --checkpoint results/full_run/training/checkpoints/best_model.pt \
-    --mri_nifti  path/to/subject.nii.gz \
-    --genetics   path/to/subject_genetics.npy \
-    --out_json   output/prediction.json
-```
-
----
-
-## Datasets
-
-| Dataset | Modality | Subjects | Sites | Access |
-|---|---|---|---|---|
-| ABIDE I | Resting-state fMRI | ~1,112 | 17 | Public via nilearn |
-| ABIDE II | Resting-state fMRI | ~1,114 | 27 | Public via nilearn |
-
-Both datasets are downloaded automatically by `prepare_abide.py` using `nilearn.datasets.fetch_abide_pcp()` / `fetch_abide2()`.  No manual registration required.
-
-> **Note on genetics:** ABIDE does not include SNP or RNA-seq data.  By default, `prepare_abide.py --genetics_mode phenotypic` builds a genetics proxy vector from ABIDE's phenotypic variables (age, sex, FIQ, VIQ, PIQ, ADOS, ADI-R) via PCA.  If you have a matched GEO expression matrix, pass `--genetics_mode geo --geo_csv path/to/expression.csv` to run the full ComBat → feature-selection → PCA pipeline.
-
----
-
-## Modules
-
-| # | Module | Tests | Description |
-|---|---|---|---|
-| 0 | Config + scaffold | — | YAML config, type-safe dataclass schema, seeding, hardware utils |
-| 1 | MRI preprocessing | — | NIfTI I/O, resampling, pad/crop, intensity normalisation (site-aware), QC |
-| 2 | Genetics preprocessing | — | Imputation, ComBat batch correction, feature selection, PCA/VAE |
-| 3 | MRI feature extraction | — | ResNet3D, DenseNet3D, SwinTransformer3D, ConvNeXt3D, SEBlock3D |
-| 4 | Genetics feature extraction | — | GeneTransformerEncoder, TabNet, GNNEncoder, GeneticsEncoder wrapper |
-| 5 | Multimodal fusion | — | CrossAttention, Gated, Intermediate, Late, Dynamic |
-| 6 | Training engine | — | FocalLoss, AdamW + cosine warmup, ModelEMA, AMP, K-fold CV |
-| 7 | Evaluation suite | 78 | AUC/F1/MCC/Brier + bootstrap CI, DeLong, McNemar, Wilcoxon, calibration |
-| 8 | Explainability | 70 | GradCAM3D, GradCAM++3D, IntegratedGradients, SmoothGrad, AttentionRollout |
-| 9 | Visualisation | 53 | ROC/PR + CI, confusion matrix, calibration, t-SNE/UMAP, saliency, gene bars |
-| 10 | Ablation study | 85 | OFAT/factorial/custom runner, Wilcoxon significance, LaTeX/markdown reports |
-| 11 | Hyperparameter tuning | 85 | Optuna 4.x — TPE/CMA-ES/NSGA-II, fANOVA importance, TuningAnalyzer |
-| 12 | Paper figures | 63 | 9 IEEE camera-ready figures (PDF + PNG), LaTeX manifest, `generate_all()` |
-
----
-
 ## Reproducibility
 
 - Master seed: `42` (set in `configs/config.yaml`)
-- Per-scope seeds derived via SHA-256 from master seed + scope string
-- All hyperparameters live in `configs/config.yaml` — no hard-coded values in code
+- All hyperparameters in one place — no hard-coded values in source
 - Optuna studies persist to SQLite; interrupted HPO runs resume automatically
-- Ablation runner checkpoints progress; interrupted runs resume from last completed variant
-
----
-
-## Hyperparameter Tuning
-
-```python
-from hyperparameter_tuning import ASDTuner
-
-tuner = ASDTuner(
-    train_fn     = your_train_fn,
-    base_config  = cfg,
-    search_space = "full",      # full / optimizer / architecture / fusion / quick
-    n_trials     = 100,
-    sampler      = "tpe",       # tpe / cma / nsga2
-    pruner       = "hyperband",
-    storage_path = "results/hpo/study.db",  # SQLite resume
-)
-tuner.optimize()
-print(tuner.best_params)
-```
-
----
-
-## Explainability
-
-```python
-from explainability import ExplainabilityEngine
-
-engine = ExplainabilityEngine(model, cfg)
-result = engine.explain(batch)
-
-# result.mri_gradcam       — (D, H, W) saliency map
-# result.mri_gradcam_pp    — GradCAM++ variant
-# result.ig_attributions   — Integrated Gradients
-# result.gene_importance   — per-gene importance scores
-# result.attention_rollout — cross-attention weights
-```
+- Checkpoint manager keeps top-k checkpoints per fold, evicts worst on save
 
 ---
 
