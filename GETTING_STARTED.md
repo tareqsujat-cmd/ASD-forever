@@ -1,7 +1,58 @@
 # Getting Started — Collaborator Guide
 
 This document tells you exactly what the project does, what data it uses, and
-how to reproduce results from scratch.  Read it before touching the code.
+how to reproduce results from scratch.
+
+---
+
+## Quick start (automated)
+
+The fastest path — one command sets up the environment, downloads the data,
+and runs a smoke test:
+
+```bash
+# 1. Clone the repo
+git clone https://github.com/tareqsujat-cmd/ASD-forever.git
+cd ASD-forever
+
+# 2. Run the bootstrap script  (needs Python 3.10+ and a CUDA GPU)
+python setup.py
+```
+
+`setup.py` will:
+- Detect your CUDA version and install the matching PyTorch build
+- Create a `.venv/` virtual environment and install all dependencies
+- Download and preprocess ABIDE I (~340 MB download, ~80 MB stored)
+- Run a smoke test on synthetic data to confirm everything works
+
+After it finishes, activate the environment and run the full experiment:
+
+```bash
+# Windows
+.venv\Scripts\activate
+
+# Linux / Mac
+source .venv/bin/activate
+
+# Full experiment (~50-60 min on a GTX 1650)
+python run_experiment.py \
+    --real_data \
+    --mri_dir ./abide_processed/mri \
+    --gen_dir ./abide_processed/gen \
+    --max_epochs 100 \
+    --n_folds 5 \
+    --skip_profile \
+    --n_hpo_trials 10
+```
+
+Optional flags for `setup.py`:
+
+| Flag | Use when |
+|------|----------|
+| `--skip-data` | You already have `abide_processed/` from a previous run |
+| `--skip-smoke` | You want to skip the 2-min verification step |
+| `--cpu-only` | No GPU available (training will be much slower) |
+| `--no-venv` | You prefer to manage your own environment |
 
 ---
 
