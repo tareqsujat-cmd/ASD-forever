@@ -1,0 +1,13 @@
+{
+  "trial_number": 2,
+  "objective": 0.7187179630893922,
+  "params": {
+    "lr": 0.0007309539835912913,
+    "weight_decay": 3.8234752246751835e-05,
+    "mri_dropout": 0.2447411578889518,
+    "fusion_arch": "late",
+    "batch_size": 32,
+    "focal_gamma": 1.3993475643167195
+  },
+  "datetime_utc": "2026-07-04T21:59:19Z"
+}

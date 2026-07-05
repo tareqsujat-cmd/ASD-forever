@@ -1,0 +1,50 @@
+name: asd-detection
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.10
+  - pip
+
+  # --- PyTorch (CPU build; replace cpuonly with pytorch-cuda=11.8 for GPU) ---
+  - pytorch>=2.1.0
+  - torchvision>=0.16.0
+  - cpuonly                         # remove this line and add pytorch-cuda=X.Y for GPU
+
+  # --- Scientific computing ---
+  - numpy>=1.26.0
+  - scipy>=1.11.0
+  - pandas>=2.1.0
+  - scikit-learn>=1.4.0
+
+  # --- Medical neuroimaging ---
+  - nibabel>=5.1.0
+  - nilearn>=0.10.3
+
+  # --- Visualisation ---
+  - matplotlib>=3.8.2
+  - seaborn>=0.13.2
+
+  # --- Configuration / utilities ---
+  - pyyaml>=6.0.1
+  - tqdm>=4.66.1
+
+  # --- Testing ---
+  - pytest>=8.0.0
+  - pytest-cov>=4.1.0
+
+  # --- pip-only packages (not on conda-forge or need exact version) ---
+  - pip:
+    - einops>=0.7.0
+    - umap-learn>=0.5.5
+    - optuna>=4.9.0
+
+    # Optional MRI backends
+    # - SimpleITK>=2.3.1
+    # - antspyx>=0.4.2
+
+    # Optional experiment tracking
+    # - mlflow>=2.10.0
+    # - wandb>=0.16.3

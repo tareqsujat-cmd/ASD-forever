@@ -1,0 +1,76 @@
+# =============================================================================
+# ASD Framework .gitignore
+# =============================================================================
+
+# Secrets
+.env
+*.key
+*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Raw datasets (too large for git; use DVC)
+datasets/raw/
+datasets/processed/
+
+# ABIDE data — raw volumes and processed arrays (subject data, not for VCS)
+abide_raw/
+abide_processed/
+
+# Large experiment result directories
+results_m9_smoke/
+
+# SQLite study databases
+*.db
+
+# Claude session files
+.claude/
+
+# Model weights
+saved_models/
+*.pth
+*.pt
+*.ckpt
+*.pkl
+*.joblib
+
+# Results & logs (tracked via MLflow/WandB)
+results/logs/
+mlruns/
+wandb/
+
+# IDE
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temp files
+*.tmp
+*.temp
+/tmp/
