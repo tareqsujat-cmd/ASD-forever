@@ -122,14 +122,33 @@ python tests/test_fusion.py          # script-style module checks (run individua
 
 ---
 
-## H. Planned accuracy experiments (see publication_plan.md §4)
+## H. Accuracy experiments (leakage-free benchmark harness)
 
-These are the next builds toward the 80–85% target (not yet wired into `run_experiment.py`):
+**E1 — tangent-FC linear baseline (fast, CPU; the honest reference number):**
+```bash
+# Pooled 10-fold + LOSO, correlation vs tangent FC, all fit in-fold.
+python run_benchmark.py --model logreg --metrics correlation tangent \
+    --protocol both --n_folds 10 --run_name benchmark_e1
+# Add a permutation test (slow): --n_perm 1000
+```
+Real result (871 subjects): tangent FC **pooled AUROC 0.756 / acc 69.3%**,
+LOSO AUROC 0.758 / acc 64.5% — matches/beats Heinsfeld (70%).
 
-- **E1.3** tangent-space FC + linear baseline (nested CV) — *reference number*
-- **E2.x** connectome transformer + multi-atlas + SSL pretraining + ensemble
-- **E3.x** component ablations · **E5.x** permutation / DeLong / bootstrap
-- **E6.x** explainability (edge importance → Yeo networks → neurobiology)
-- **E7.x** external validation on ABIDE-II
+**E2 — connectome transformer (GPU job; needs proper epochs + tuning to beat linear):**
+```bash
+# Run on RunPod/CUDA — slow on CPU/MPS.
+python run_benchmark.py --model transformer --metrics tangent \
+    --protocol pooled --n_folds 10 --epochs 200 --device cuda --run_name benchmark_transformer
+```
+> A short/untuned transformer underperforms the linear baseline (expected).
+> The 80–85% climb needs SSL pretraining (`MaskedConnectomeAutoencoder`),
+> multi-atlas fusion, and ensembling — see publication_plan.md §2.
 
-Commands for these will be added here as each experiment lands.
+**E6 — explainability: discriminative FC edges + cross-fold stability:**
+```bash
+python analyze_edges.py --n_folds 10 --top_k 50 --run_name explainability_edges
+# -> results/<run>/edges/{top_edges.csv, edge_importance.png, edge_report.json}
+```
+
+**Still to build (publication_plan.md §4):** multi-atlas download+fusion (E2.3),
+in-fold ComBat (E2.4), ensemble (E2.6), DeLong/McNemar (E5), ABIDE-II external (E7).
