@@ -30,11 +30,11 @@ def _fusion_dimension() -> AblationDimension:
     return AblationDimension(
         name="fusion",
         variants={
-            "cross_attention": {"fusion.architecture": "cross_attention"},
-            "gated":           {"fusion.architecture": "gated"},
-            "late":            {"fusion.architecture": "late"},
-            "intermediate":    {"fusion.architecture": "intermediate"},
-            "dynamic":         {"fusion.architecture": "dynamic"},
+            "cross_attention": {"fusion.method": "cross_attention"},
+            "gated":           {"fusion.method": "gated"},
+            "late":            {"fusion.method": "late"},
+            "intermediate":    {"fusion.method": "intermediate"},
+            "dynamic":         {"fusion.method": "dynamic"},
         },
         default="cross_attention",
         description="Multimodal fusion strategy",

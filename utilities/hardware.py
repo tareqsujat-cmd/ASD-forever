@@ -21,30 +21,58 @@ import torch
 logger = logging.getLogger(__name__)
 
 
-def get_device(preference: str = "cuda") -> torch.device:
+def _mps_available() -> bool:
+    return (
+        hasattr(torch.backends, "mps")
+        and torch.backends.mps.is_available()
+        and torch.backends.mps.is_built()
+    )
+
+
+def get_device(preference: str = "auto") -> torch.device:
     """
-    Return the best available device.
+    Return the best available device, cascading to the next-best when the
+    requested one is missing.
 
     Parameters
     ----------
     preference : str
-        "cuda" | "mps" | "cpu"
+        "auto" | "cuda" | "mps" | "cpu".  ``"auto"`` (and the historical default
+        of ``"cuda"``) try CUDA → Apple MPS → CPU in order, so the same config
+        runs GPU-accelerated on both an NVIDIA box and an Apple-silicon Mac.
+        Pass an explicit ``"cpu"`` to force CPU.
 
     Returns
     -------
     torch.device
     """
-    if preference == "cuda" and torch.cuda.is_available():
+    pref = (preference or "auto").lower()
+
+    if pref == "cpu":
+        logger.info("Using CPU (explicitly requested)")
+        return torch.device("cpu")
+
+    # CUDA first for "auto"/"cuda".
+    if pref in ("auto", "cuda") and torch.cuda.is_available():
         device = torch.device("cuda")
         logger.info(f"Using CUDA: {torch.cuda.get_device_name(0)}")
         _log_gpu_memory()
         return device
 
-    if preference == "mps" and hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-        logger.info("Using Apple MPS backend")
+    # Apple MPS next.  "cuda" cascades to MPS too (common on Macs where the
+    # config default is "cuda" but no NVIDIA GPU exists).
+    if pref in ("auto", "cuda", "mps") and _mps_available():
+        # Route any op without an MPS kernel to the CPU instead of crashing.
+        os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
+        logger.info("Using Apple MPS backend (Metal GPU)")
         return torch.device("mps")
 
-    logger.warning(f"Requested device '{preference}' unavailable, falling back to CPU")
+    if pref == "cuda":
+        logger.warning("CUDA/MPS requested but unavailable — falling back to CPU")
+    elif pref == "mps":
+        logger.warning("MPS requested but unavailable — falling back to CPU")
+    else:
+        logger.info("No GPU available — using CPU")
     return torch.device("cpu")
 
 

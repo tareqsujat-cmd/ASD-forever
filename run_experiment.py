@@ -92,6 +92,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger("run_experiment")
 
+# Canonical phenotypic ("genetics" branch) feature names for the FC pipeline,
+# in the order produced by data/preprocess_abide.py::_extract_pheno.  Used for
+# labelling feature-importance plots (these are NOT genetic SNPs).
+PHENOTYPIC_FEATURE_NAMES = ["age", "sex", "FIQ", "VIQ", "PIQ", "handedness"]
+
+
+def _feature_names(n: int) -> List[str]:
+    """Real phenotypic names when the count matches, else generic labels."""
+    if n == len(PHENOTYPIC_FEATURE_NAMES):
+        return list(PHENOTYPIC_FEATURE_NAMES)
+    return [f"pheno_{i}" for i in range(n)]
+
 
 # ===========================================================================
 # Stage 0 — Configuration
@@ -110,46 +122,48 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--max_epochs",       type=int, default=None)
     p.add_argument("--n_ablation_trials",type=int, default=None)
     p.add_argument("--n_hpo_trials",     type=int, default=None)
-    p.add_argument("--out_dir",          type=str, default="results")
+    p.add_argument("--out_dir",          type=str, default="results",
+                   help="Results ROOT; each run is written to <out_dir>/run_N/")
+    p.add_argument("--run_name",         type=str, default=None,
+                   help="Explicit run directory name (default: auto-increment run_N)")
     p.add_argument("--seed",             type=int, default=42)
-    p.add_argument("--device",           type=str, default=None)
+    p.add_argument("--device",           type=str, default=None,
+                   help='"auto" | "cuda" | "mps" | "cpu" (default: auto-detect)')
     p.add_argument("--skip_profile",     action="store_true",
                    help="Skip computational profiling (FLOPs/latency)")
     return p.parse_args()
 
 
 def _setup(args: argparse.Namespace):
-    """Load config, override fields for synthetic mode, set seeds."""
+    """Load config, set seeds/device, apply synthetic overrides, allocate run dir.
+
+    Returns ``(cfg, device, run_dir, seed)`` where ``run_dir`` is a fresh
+    ``<out_dir>/run_N/`` directory that every pipeline stage writes into.
+    """
     from configs.config_schema import load_config
+    from utilities.reproducibility import seed_everything
+    from utilities.hardware import get_device
+    from utilities.run_dir import (
+        create_run_dir, attach_file_logger, snapshot_config, write_manifest,
+    )
+
     cfg = load_config(Path(__file__).parent / "configs" / "config.yaml")
 
-    # Device
-    if args.device:
-        cfg.project.device = args.device
-    device_str = cfg.project.device
-    if device_str == "cuda" and not torch.cuda.is_available():
-        logger.warning("CUDA requested but not available — using CPU")
-        device_str = "cpu"
-    device = torch.device(device_str)
+    # --- Reproducibility: seed every RNG + request deterministic algorithms ---
+    seed = args.seed
+    seed_everything(seed, deterministic_cudnn=True)
+
+    # --- Device: auto-detect CUDA -> Apple MPS -> CPU (cascading) ---
+    requested = args.device or getattr(cfg.project, "device", "auto")
+    device = get_device(requested)
+    cfg.project.device = device.type
     logger.info("Device: %s", device)
 
-    # CUDA performance flags — set before any model construction
+    # TF32 gives a large speedup on Ampere+ GPUs with negligible precision loss
+    # for (non-safety-critical) classification.  CUDA only; harmless elsewhere.
     if device.type == "cuda":
-        # cuDNN auto-tunes the fastest conv algorithm for each input shape
-        torch.backends.cudnn.benchmark = True
-        # TF32 gives ~3× speedup on Ampere (RTX 30xx, A100) with negligible
-        # precision loss for ASD classification (not safety-critical)
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.allow_tf32 = True
-        logger.info(
-            "CUDA perf flags: cudnn.benchmark=True, TF32=True "
-            "(GPU: %s)", torch.cuda.get_device_name(0)
-        )
-
-    # Seed
-    seed = args.seed
-    torch.manual_seed(seed)
-    np.random.seed(seed)
 
     # Synthetic-mode overrides: small dimensions, few epochs/folds for speed
     if not args.real_data:
@@ -173,9 +187,20 @@ def _setup(args: argparse.Namespace):
         if args.n_folds:
             cfg.training.cross_validation.n_folds = args.n_folds
 
-    out_dir = Path(args.out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    return cfg, device, out_dir, seed
+    # --- Allocate a fresh per-run directory: <out_dir>/run_N/ ---
+    # Every stage writes inside this directory, so runs never overwrite one
+    # another and each run is self-contained and reproducible.
+    run_dir = create_run_dir(args.out_dir, run_name=args.run_name)
+    attach_file_logger(run_dir)
+    snapshot_config(cfg, run_dir)
+    write_manifest(
+        run_dir,
+        seed=seed,
+        device=device,
+        args=args,
+        mode="real" if args.real_data else "synthetic",
+    )
+    return cfg, device, run_dir, seed
 
 
 # ===========================================================================
@@ -315,36 +340,54 @@ class ABIDEDataset(Dataset):
 # CV splits
 # ---------------------------------------------------------------------------
 
+def _get_labels(dataset: Dataset) -> np.ndarray:
+    """Return the class label (0/1) array for a dataset without loading arrays."""
+    if hasattr(dataset, "labels"):
+        return np.asarray(dataset.labels).astype(int)
+    if hasattr(dataset, "records"):          # path-based ABIDEDataset
+        return np.array([int(r["label"]) for r in dataset.records])
+    return np.array([int(dataset[i]["label"]) for i in range(len(dataset))])
+
+
 def _make_cv_splits(
-    dataset:   Dataset,
-    n_folds:   int,
-    site_attr: str = "sites",
-    seed:      int = 42,
+    dataset:       Dataset,
+    n_folds:       int,
+    seed:          int = 42,
+    group_by_site: bool = False,
 ) -> List[Tuple[List[int], List[int]]]:
     """
-    Site-stratified K-fold splits.
+    Class-stratified K-fold splits.
 
-    For synthetic data the dataset has a ``.sites`` array; for real data
-    a ``"site"`` key in each item.  Falls back to label-stratified if site
-    info is unavailable.
+    Folds are always stratified by the **diagnosis label** so every fold keeps
+    the ASD/TC balance — essential for a meaningful, comparable AUROC/accuracy.
+
+    When ``group_by_site`` is True and there are at least ``n_folds`` sites, a
+    ``StratifiedGroupKFold`` grouped by acquisition site is used instead: each
+    site's subjects fall entirely in one fold, so the model is validated on
+    *unseen sites* (a stricter, cross-site generalization protocol).  This is
+    the honest interpretation of the config's ``group_by_site`` flag.
     """
-    from sklearn.model_selection import StratifiedKFold
-
     n = len(dataset)
     indices = np.arange(n)
+    labels = _get_labels(dataset)
+    sites = getattr(dataset, "sites", None)
 
-    # Retrieve site/label arrays for stratification
-    if hasattr(dataset, "sites"):
-        strat_labels = dataset.sites
+    if (
+        group_by_site
+        and sites is not None
+        and len(np.unique(np.asarray(sites))) >= n_folds
+    ):
+        from sklearn.model_selection import StratifiedGroupKFold
+        splitter = StratifiedGroupKFold(n_splits=n_folds, shuffle=True, random_state=seed)
+        iterator = splitter.split(indices, labels, groups=np.asarray(sites))
+        logger.info("CV: %d-fold StratifiedGroupKFold (leave-sites-out, label-stratified)", n_folds)
     else:
-        strat_labels = np.array([dataset[i]["label"].item() for i in range(n)])
+        from sklearn.model_selection import StratifiedKFold
+        splitter = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=seed)
+        iterator = splitter.split(indices, labels)
+        logger.info("CV: %d-fold StratifiedKFold (label-stratified, pooled across sites)", n_folds)
 
-    skf    = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=seed)
-    splits = [
-        (train_idx.tolist(), val_idx.tolist())
-        for train_idx, val_idx in skf.split(indices, strat_labels)
-    ]
-    return splits
+    return [(tr.tolist(), va.tolist()) for tr, va in iterator]
 
 
 # ===========================================================================
@@ -479,13 +522,12 @@ def run_evaluation(
     Full evaluation: bootstrap CI, calibration, per-site, model comparisons.
 
     Loads each fold's best checkpoint and runs inference on that fold's
-    validation set to collect real y_true / y_prob arrays.  Falls back
-    to a synthetic placeholder only if checkpoints are unavailable.
+    validation set to collect real, out-of-fold y_true / y_prob arrays.
+    If no checkpoints are found it raises (never fabricates predictions).
     """
     from evaluation.evaluator import ASDEvaluator
-    from training.checkpointing import CheckpointManager
 
-    evaluator = ASDEvaluator(cfg=cfg, n_bootstrap=500)
+    evaluator = ASDEvaluator(cfg=cfg, n_bootstrap=cfg.evaluation.bootstrap_iterations)
     cv_report = evaluator.evaluate_cv(fold_results)
 
     logger.info("CV evaluation (t-dist CI across folds):")
@@ -493,65 +535,40 @@ def run_evaluation(
         logger.info("  %-22s %.4f [%.4f, %.4f]", name, mci.value,
                     mci.ci_lower, mci.ci_upper)
 
-    # --- Collect real predictions from each fold's best checkpoint ---
+    # --- Collect REAL out-of-fold predictions from each fold's best checkpoint.
+    # Every subject is scored by the model of the fold in which it was the
+    # validation set, so the pooled predictions are genuinely out-of-fold.
     y_true_all: List[int]   = []
     y_prob_all: List[float] = []
     site_ids_all: List[str] = []
+    feats_all: List[np.ndarray] = []
 
     if model_factory is not None and device is not None and train_dir is not None:
         for fold_idx, (_, val_idx) in enumerate(splits):
-            fold_dir   = Path(train_dir) / f"fold_{fold_idx}"
-            ckpt_files = sorted(fold_dir.glob("*.pt")) if fold_dir.exists() else []
-
-            if not ckpt_files:
+            best_ckpt = _best_ckpt_in(Path(train_dir) / f"fold_{fold_idx}")
+            if best_ckpt is None:
                 logger.warning("No checkpoint for fold %d — skipping inference", fold_idx)
                 continue
+            logger.info("Fold %d: inference with checkpoint %s", fold_idx, best_ckpt.name)
+            yt, yp, si, ft = _infer_probs(model_factory, device, best_ckpt, dataset, val_idx)
+            y_true_all.extend(yt.tolist())
+            y_prob_all.extend(yp.tolist())
+            site_ids_all.extend(si.tolist())
+            if ft is not None:
+                feats_all.append(ft)
 
-            def _auc_from_name(p: Path) -> float:
-                try:
-                    return float(p.stem.split("val_auc")[-1])
-                except Exception:
-                    return -1.0
+    if not y_true_all:
+        # No real predictions → refuse to fabricate. A trustworthy report cannot
+        # be produced without trained checkpoints; fail loudly instead.
+        raise RuntimeError(
+            "Evaluation found no fold checkpoints to run inference on. "
+            f"Expected checkpoints under {train_dir}. Training must complete "
+            "before evaluation; synthetic placeholder metrics are not permitted."
+        )
 
-            best_ckpt = max(ckpt_files, key=_auc_from_name)
-            logger.info("Fold %d: loading checkpoint %s for inference", fold_idx, best_ckpt.name)
-
-            model = model_factory().to(device)
-            CheckpointManager.load_from_path(best_ckpt, model, device=device)
-            model.eval()
-
-            val_subset = torch.utils.data.Subset(dataset, val_idx)
-            loader = DataLoader(val_subset, batch_size=32, shuffle=False, num_workers=0)
-
-            with torch.no_grad():
-                for batch in loader:
-                    mri    = batch["image"].to(device)
-                    gen    = batch["genetics"].to(device)
-                    labels = batch["label"].cpu().numpy()
-                    sites  = batch["site"].cpu().numpy()
-
-                    output = model(mri, gen)
-                    probs  = torch.softmax(output["logits"].float(), dim=-1)[:, 1].cpu().numpy()
-
-                    y_true_all.extend(labels.tolist())
-                    y_prob_all.extend(probs.tolist())
-                    site_ids_all.extend(str(s) for s in sites.tolist())
-
-            del model
-            if device is not None and device.type == "cuda":
-                torch.cuda.empty_cache()
-
-    if y_true_all:
-        y_true   = np.array(y_true_all)
-        y_prob   = np.array(y_prob_all, dtype=np.float32)
-        site_ids = np.array(site_ids_all)
-    else:
-        logger.warning("No checkpoints found — using synthetic placeholder for plots")
-        rng      = np.random.default_rng(0)
-        n_test   = max(len(splits[0][1]), 20)
-        y_true   = np.array([0] * (n_test // 2) + [1] * (n_test - n_test // 2))
-        y_prob   = np.clip(y_true * 0.45 + rng.normal(0, 0.18, len(y_true)) + 0.3, 0.01, 0.99)
-        site_ids = rng.integers(0, 4, len(y_true)).astype(str)
+    y_true   = np.array(y_true_all)
+    y_prob   = np.array(y_prob_all, dtype=np.float32)
+    site_ids = np.array(site_ids_all)
 
     report = evaluator.evaluate(y_true, y_prob, site_ids=site_ids.astype(str))
     logger.info("\n%s", report.summary())
@@ -576,6 +593,8 @@ def run_evaluation(
     )
     err_report.print_summary()
 
+    features = np.concatenate(feats_all, axis=0) if feats_all else None
+
     return {
         "cv_report":  cv_report,
         "report":     report,
@@ -583,6 +602,7 @@ def run_evaluation(
         "y_true":     y_true,
         "y_prob":     y_prob,
         "site_ids":   site_ids,
+        "features":   features,   # real fused embeddings (out-of-fold), or None
     }
 
 
@@ -590,22 +610,97 @@ def run_evaluation(
 # Stage 4b — Held-out (ABIDE II) external validation
 # ===========================================================================
 
+def _best_ckpt_in(fold_dir: Path) -> Optional[Path]:
+    """Return the highest-val_auc checkpoint in a fold directory, or None."""
+    ckpts = sorted(fold_dir.glob("*.pt")) if Path(fold_dir).exists() else []
+    if not ckpts:
+        return None
+
+    def _auc(p: Path) -> float:
+        try:
+            return float(p.stem.split("val_auc")[-1])
+        except Exception:
+            return -1.0
+
+    return max(ckpts, key=_auc)
+
+
+def _infer_probs(
+    model_factory,
+    device: torch.device,
+    ckpt_path: Path,
+    dataset: Dataset,
+    indices: Optional[List[int]] = None,
+    batch_size: int = 32,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, Optional[np.ndarray]]:
+    """
+    Load ``ckpt_path`` into a fresh model and run real inference.
+
+    Returns ``(y_true, y_prob, site_ids, fused_features)`` over
+    ``dataset[indices]`` (or the whole dataset when ``indices`` is None).
+    ``fused_features`` is the model's fused embedding (for projection plots),
+    or None if the fusion module does not expose it.  This is the single
+    source of truth for turning trained checkpoints into predictions — no
+    synthetic probabilities anywhere.
+    """
+    from training.checkpointing import CheckpointManager
+
+    subset = dataset if indices is None else torch.utils.data.Subset(dataset, indices)
+    loader = DataLoader(subset, batch_size=batch_size, shuffle=False, num_workers=0)
+
+    model = model_factory().to(device)
+    CheckpointManager.load_from_path(ckpt_path, model, device=device)
+    model.eval()
+
+    y_true: List[int] = []
+    y_prob: List[float] = []
+    site_ids: List[str] = []
+    feats: List[np.ndarray] = []
+    with torch.no_grad():
+        for batch in loader:
+            mri = batch["image"].to(device)
+            gen = batch["genetics"].to(device)
+            out = model(mri, gen)
+            probs = torch.softmax(out["logits"].float(), dim=-1)[:, 1].cpu().numpy()
+            y_true.extend(batch["label"].cpu().numpy().tolist())
+            y_prob.extend(probs.tolist())
+            site_ids.extend(str(s) for s in batch["site"].cpu().numpy().tolist())
+            fused = out.get("fused_features")
+            if fused is not None:
+                feats.append(fused.float().cpu().numpy())
+
+    del model
+    if device.type == "cuda":
+        torch.cuda.empty_cache()
+
+    features = np.concatenate(feats, axis=0) if feats else None
+    return (
+        np.array(y_true),
+        np.array(y_prob, dtype=np.float32),
+        np.array(site_ids),
+        features,
+    )
+
+
 def run_held_out_evaluation(
     cfg,
-    fold_results:  List[Dict[str, float]],
     mri_dir:       str,
     gen_dir:       str,
     out_dir:       Path,
+    model_factory,
+    device:        torch.device,
+    train_dir:     Path,
+    n_folds:       int,
 ) -> Optional[Dict[str, Any]]:
     """
-    Evaluate the trained model on the held-out ABIDE II external test set.
+    Evaluate the trained CV ensemble on a held-out external test set (ABIDE II).
 
-    Loads all subjects whose metadata ``split`` column equals ``"test"``,
-    then runs ASDEvaluator with the same bootstrap settings as the internal
-    evaluation.  Results are written to ``out_dir/held_out_report.json``.
+    For every fold's best checkpoint we run real inference over the *entire*
+    held-out cohort, then average the per-subject probabilities across folds
+    (soft-voting ensemble).  Nothing here is synthetic — if no checkpoints are
+    found the stage is skipped rather than fabricating predictions.
 
-    Returns the evaluation bundle (same structure as run_evaluation) or None
-    if the held-out dataset is empty.
+    Results are written to ``out_dir/held_out_report.json``.
     """
     from evaluation.evaluator import ASDEvaluator
 
@@ -614,40 +709,44 @@ def run_held_out_evaluation(
         logger.warning("Held-out dataset is empty — skipping external validation.")
         return None
 
-    logger.info(
-        "Held-out ABIDE II: %d subjects", len(held_out_dataset)
-    )
+    n = len(held_out_dataset)
+    logger.info("Held-out external set: %d subjects", n)
 
-    evaluator = ASDEvaluator(cfg=cfg, n_bootstrap=500)
-    cv_report = evaluator.evaluate_cv(fold_results)
+    # --- Real ensemble inference across all fold checkpoints ---
+    prob_sum = np.zeros(n, dtype=np.float64)
+    y_true: Optional[np.ndarray] = None
+    site_ids: Optional[np.ndarray] = None
+    n_models = 0
 
-    # Synthetic prediction arrays sized to held-out cohort
-    # (replace with real inference pass when checkpoints are available)
-    rng    = np.random.default_rng(1)
-    n_test = len(held_out_dataset)
-    y_true = np.array(
-        held_out_dataset.labels if hasattr(held_out_dataset, "labels")
-        else [held_out_dataset[i]["label"].item() for i in range(n_test)]
-    )
-    y_prob = np.clip(
-        y_true * 0.42 + rng.normal(0, 0.20, n_test) + 0.29, 0.01, 0.99
-    )
-    site_ids = np.array(
-        held_out_dataset.sites if hasattr(held_out_dataset, "sites")
-        else [held_out_dataset[i]["site"].item() for i in range(n_test)]
-    ).astype(str)
+    for fold_idx in range(n_folds):
+        best = _best_ckpt_in(Path(train_dir) / f"fold_{fold_idx}")
+        if best is None:
+            logger.warning("No checkpoint for fold %d — excluded from ensemble", fold_idx)
+            continue
+        yt, yp, si, _ = _infer_probs(model_factory, device, best, held_out_dataset)
+        prob_sum += yp
+        y_true, site_ids = yt, si
+        n_models += 1
+        logger.info("Held-out: fold %d checkpoint %s → inference done", fold_idx, best.name)
 
-    report = evaluator.evaluate(y_true, y_prob, site_ids=site_ids)
-    logger.info("Held-out evaluation:\n%s", report.summary())
+    if n_models == 0 or y_true is None:
+        logger.warning("No trained checkpoints available — skipping held-out evaluation.")
+        return None
+
+    y_prob = (prob_sum / n_models).astype(np.float32)
+
+    evaluator = ASDEvaluator(cfg=cfg, n_bootstrap=cfg.evaluation.bootstrap_iterations)
+    report = evaluator.evaluate(y_true, y_prob, site_ids=site_ids.astype(str))
+    logger.info("Held-out evaluation (%d-model ensemble):\n%s", n_models, report.summary())
     out_dir.mkdir(parents=True, exist_ok=True)
     report.save_json(out_dir / "held_out_report.json")
 
     return {
-        "cv_report": cv_report,
-        "report":    report,
-        "y_true":    y_true,
-        "y_prob":    y_prob,
-        "site_ids":  site_ids,
+        "report":   report,
+        "y_true":   y_true,
+        "y_prob":   y_prob,
+        "site_ids": site_ids,
+        "n_models": n_models,
     }
 
 
@@ -714,7 +813,7 @@ def run_ablation(
 
     runner   = AblationRunner(
         train_fn     = train_fn,
-        save_dir     = out_dir / "ablation",
+        save_dir     = out_dir,   # out_dir is already <run>/ablation (avoid ablation/ablation)
         config_modifier = lambda base, overrides: overrides,  # overrides passed directly
         verbose      = True,
     )
@@ -860,7 +959,7 @@ def run_explainability(
         else:
             gene_imp = np.ones(genetics.shape[1])
 
-        gene_names = [f"SNP_{i:04d}" for i in range(len(gene_imp))]
+        gene_names = _feature_names(len(gene_imp))
 
         logger.info(
             "Explainability: saliency shape=%s  gene_imp shape=%s",
@@ -881,7 +980,7 @@ def run_explainability(
             "mri_volume":       np.zeros((D, H, W), dtype=np.float32),
             "saliency":         np.zeros((D, H, W), dtype=np.float32),
             "gene_importances": np.zeros(n_genes,   dtype=np.float32),
-            "gene_names":       [f"SNP_{i}" for i in range(n_genes)],
+            "gene_names":       _feature_names(n_genes),
         }
 
 
@@ -899,7 +998,13 @@ def run_paper_figures(
     fold_results: List[Dict[str, float]],
     dataset:      Dataset,
 ) -> None:
-    """Generate all 9 paper figures and the LaTeX manifest."""
+    """Generate the paper figures from REAL results only.
+
+    No synthetic/placeholder data is injected: curves come from the model's
+    real out-of-fold predictions, the projection uses real fused embeddings,
+    and calibration computes Brier from the real predictions.  Figures whose
+    inputs are unavailable are simply skipped (generate_all is defensive).
+    """
     from paper.paper_figures import PaperFigureGenerator
 
     figures_dir = out_dir / "paper_figures"
@@ -909,71 +1014,52 @@ def run_paper_figures(
         dpi        = 300,
     )
 
-    rng = np.random.default_rng(1)
-    n   = len(eval_bundle["y_true"])
-
-    # Build cv_results in the format fig_cv_summary expects
-    cv_results_for_fig = []
-    for fold_idx, fm in enumerate(fold_results):
-        for metric in ["val_auc", "val_acc", "val_loss"]:
-            pass  # already per-fold dicts
-        cv_results_for_fig.append({
-            "model": "Proposed",
-            "fold":  fold_idx,
-            **fm,
-        })
-        # Synthetic baselines for comparison plot
-        cv_results_for_fig.append({
-            "model":   "MRI-only",
-            "fold":    fold_idx,
-            "val_auc": float(np.clip(fm.get("val_auc", 0.5) - 0.06
-                                      + rng.normal(0, 0.02), 0.4, 1.0)),
-            "val_acc": float(np.clip(fm.get("val_acc", 0.5) - 0.06
-                                      + rng.normal(0, 0.02), 0.4, 1.0)),
-        })
-
-    # Second model for ROC comparison
     y_true = eval_bundle["y_true"]
     y_prob = eval_bundle["y_prob"]
-    y_prob_mri = np.clip(
-        y_true * 0.35 + rng.normal(0, 0.22, len(y_true)) + 0.32, 0.01, 0.99
-    )
+    report = eval_bundle.get("report")
+    threshold = float(getattr(report, "threshold", 0.5)) if report is not None else 0.5
 
-    site_counts_dict = {}
+    # Real per-fold CV results — the proposed model only.  We do NOT invent
+    # comparison baselines; if a real baseline is wanted it must be trained
+    # (e.g. via the mri_only/genetics_only ablation modes).
+    cv_results_for_fig = [
+        {"model": "Proposed", "fold": i, **fm} for i, fm in enumerate(fold_results)
+    ]
+
+    # Real site counts from the dataset.
+    site_counts_dict: Dict[str, int] = {}
     if hasattr(dataset, "sites"):
         for s in dataset.sites:
-            site_counts_dict[f"Site_{s}"] = \
-                site_counts_dict.get(f"Site_{s}", 0) + 1
+            key = f"Site_{s}"
+            site_counts_dict[key] = site_counts_dict.get(key, 0) + 1
 
-    brier_dict = {
-        "brier_score": 0.18,
-        "calibration": 0.02,
-        "resolution":  0.12,
-        "uncertainty": 0.25,
-    }
-
-    bundle = {
-        "site_counts":      site_counts_dict or {"Site_0": 20, "Site_1": 25,
-                                                   "Site_2": 18, "Site_3": 17},
-        "class_counts":     {"ASD": int(y_true.sum()),
-                             "TC":  int((1 - y_true).sum())},
+    bundle: Dict[str, Any] = {
+        "site_counts":  site_counts_dict,
+        "class_counts": {"ASD": int(np.sum(y_true == 1)),
+                         "TC":  int(np.sum(y_true == 0))},
         "models": [
             {"name": "Proposed", "y_true": y_true, "y_prob": y_prob,
              "color": "#e41a1c"},
-            {"name": "MRI-only", "y_true": y_true, "y_prob": y_prob_mri,
-             "color": "#377eb8"},
         ],
         "ablation_results": abl_results,
         "cv_results":       cv_results_for_fig,
         **expl_bundle,
-        "features":         rng.standard_normal((n, 32)).astype(np.float32),
-        "labels":           y_true,
         "site_ids":         eval_bundle["site_ids"],
         "y_true":           y_true,
         "y_prob":           y_prob,
-        "brier_dict":       brier_dict,
+        "threshold":        threshold,
+        "cv_report":        eval_bundle.get("cv_report"),
         "tuner":            tuner,
     }
+
+    # Real fused embeddings (out-of-fold, aligned with y_true/site_ids).
+    # Omit the projection figure entirely if embeddings are unavailable.
+    features = eval_bundle.get("features")
+    if features is not None and len(features) == len(y_true):
+        bundle["features"] = features
+        bundle["labels"]   = y_true
+    else:
+        logger.info("No real embeddings available — skipping projection figure")
 
     saved = gen.generate_all(bundle)
     import matplotlib.pyplot as plt
@@ -1117,7 +1203,12 @@ def main() -> None:
         )
 
     n_folds = cfg.training.cross_validation.n_folds
-    splits  = _make_cv_splits(dataset, n_folds=n_folds, seed=seed)
+    splits  = _make_cv_splits(
+        dataset,
+        n_folds=n_folds,
+        seed=seed,
+        group_by_site=getattr(cfg.training.cross_validation, "group_by_site", False),
+    )
 
     # ------------------------------------------------------------------
     # Stage 1b — Pre-training Data Validation
@@ -1267,10 +1358,13 @@ def main() -> None:
         logger.info("\n--- Stage 4d: Held-out ABIDE II Evaluation ---")
         held_out_bundle = run_held_out_evaluation(
             cfg,
-            train_results["fold_results"],
-            mri_dir  = args.held_out_mri_dir,
-            gen_dir  = args.held_out_gen_dir,
-            out_dir  = out_dir / "held_out_evaluation",
+            mri_dir       = args.held_out_mri_dir,
+            gen_dir       = args.held_out_gen_dir,
+            out_dir       = out_dir / "held_out_evaluation",
+            model_factory = model_factory,
+            device        = device,
+            train_dir     = out_dir / "training" / "checkpoints",
+            n_folds       = n_folds,
         )
 
     # ------------------------------------------------------------------
@@ -1351,9 +1445,20 @@ def main() -> None:
         logger.warning("HTML report generation failed (%s) — continuing.", exc)
 
     # ------------------------------------------------------------------
-    # Done
+    # Done — finalise the run manifest with timing + headline metrics
     # ------------------------------------------------------------------
     elapsed = time.time() - t_start
+    try:
+        from utilities.run_dir import update_manifest
+        update_manifest(out_dir, {
+            "elapsed_seconds": round(elapsed, 1),
+            "completed": True,
+            "cv_mean_metrics": train_results.get("mean_metrics", {}),
+            "cv_std_metrics":  train_results.get("std_metrics", {}),
+        })
+    except Exception as exc:
+        logger.debug("Manifest finalisation skipped: %s", exc)
+
     logger.info("\n%s", "=" * 60)
     logger.info("Pipeline complete in %.1f seconds (%.1f min)",
                 elapsed, elapsed / 60)

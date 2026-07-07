@@ -31,6 +31,19 @@ AMBER  = "#D97706"
 GREY   = "#6B7280"
 LIGHT  = "#F3F4F6"
 
+# Publication base style: scienceplots (science+ieee, no-latex so it works without
+# a LaTeX install).  Falls back silently to plain matplotlib if unavailable.
+try:
+    import scienceplots  # noqa: F401  (registers styles)
+    for _combo in (["science", "ieee", "no-latex"], ["science", "no-latex"]):
+        try:
+            plt.style.use(_combo)
+            break
+        except Exception:
+            continue
+except Exception:
+    pass
+
 plt.rcParams.update({
     "figure.facecolor": "white",
     "axes.facecolor":   "white",

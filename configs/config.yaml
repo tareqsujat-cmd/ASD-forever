@@ -9,14 +9,14 @@ project:
   version: "1.0.0"
   description: "Multimodal ASD detection using structural MRI and genetic data"
   random_seed: 42
-  device: "cuda"          # "cuda" | "cpu" | "mps"
+  device: "auto"          # "auto" | "cuda" | "mps" | "cpu"  (auto: cuda→mps→cpu)
   mixed_precision: true
   num_workers: 4
   pin_memory: true
 
 # --- Paths ---
 paths:
-  root: "e:/ASD_forever"
+  root: "."          # repo root (OS-agnostic; was a hardcoded Windows path)
   data_raw_mri: "datasets/raw/mri"
   data_raw_genetics: "datasets/raw/genetics"
   data_processed_mri: "abide_processed/mri"
@@ -156,11 +156,14 @@ training:
     min_delta: 1.0e-4
 
   # Cross-validation
+  # Headline protocol = pooled, subject-independent, stratified 10-fold
+  # (matches Heinsfeld 2018 / METAFormer, so "beat 70%" is like-for-like).
+  # Leave-one-site-out is reported separately for rigor (group_by_site=true).
   cross_validation:
     enabled: true
-    n_folds: 5
+    n_folds: 10
     stratified: true
-    group_by_site: true         # Prevent site-leakage across folds (critical for ABIDE)
+    group_by_site: false        # false = pooled headline; true = leave-one-site-out
 
   # Loss function
   loss:

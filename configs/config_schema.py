@@ -32,7 +32,7 @@ class ProjectConfig:
     version: str = "1.0.0"
     description: str = ""
     random_seed: int = 42
-    device: str = "cuda"
+    device: str = "auto"          # auto: cuda → mps → cpu
     mixed_precision: bool = True
     num_workers: int = 4
     pin_memory: bool = True
@@ -40,7 +40,7 @@ class ProjectConfig:
 
 @dataclass
 class PathsConfig:
-    root: str = "e:/ASD_forever"
+    root: str = "."          # repo root (OS-agnostic; was a hardcoded Windows path)
     data_raw_mri: str = "datasets/raw/mri"
     data_raw_genetics: str = "datasets/raw/genetics"
     data_processed_mri: str = "datasets/processed/mri"

@@ -33,6 +33,7 @@ optuna>=4.9.0           # TPE/CMA-ES/NSGA-II; 4.x API required
 # --- Visualisation ---
 matplotlib>=3.8.2
 seaborn>=0.13.2
+scienceplots>=2.1.0     # IEEE/science publication figure styles (no-latex fallback)
 umap-learn>=0.5.5       # UMAP embedding plots
 
 # --- Configuration ---

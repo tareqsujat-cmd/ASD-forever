@@ -500,14 +500,20 @@ class ASDTrainer:
         pin        = self.device.type == "cuda"
         n_workers  = getattr(self.cfg.project, "num_workers", 4)
 
+        seed = int(getattr(self.cfg.project, "random_seed", 42))
         kwargs: Dict[str, Any] = dict(
             batch_size  = tcfg.batch_size,
             shuffle     = shuffle,
             num_workers = n_workers,
             pin_memory  = pin,
             drop_last   = shuffle,
-            worker_init_fn = get_worker_init_fn(getattr(self.cfg.project, "random_seed", 42)),
+            worker_init_fn = get_worker_init_fn(seed),
         )
+        # Deterministic shuffle order, independent of prior RNG consumption.
+        if shuffle:
+            g = torch.Generator()
+            g.manual_seed(seed)
+            kwargs["generator"] = g
         if n_workers > 0:
             kwargs["persistent_workers"] = True
             kwargs["prefetch_factor"]    = 2

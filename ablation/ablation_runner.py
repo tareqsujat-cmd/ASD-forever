@@ -161,7 +161,8 @@ class AblationRunner:
             except Exception as e:
                 logger.error(
                     "Variant '%s' failed with %s: %s",
-                    variant_name, type(e).__name__, e
+                    variant_name, type(e).__name__, e,
+                    exc_info=True,   # log full traceback so failures are debuggable
                 )
                 # Store failure so it doesn't block resume
                 results.add(variant_name, [{"error": 1.0}], elapsed_seconds=0.0)

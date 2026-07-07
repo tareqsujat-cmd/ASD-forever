@@ -73,15 +73,63 @@ PALETTE = [
 # Helpers
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# scienceplots integration
+# ---------------------------------------------------------------------------
+# All publication figures render on top of the scienceplots "science"+"ieee" base
+# style, using the "no-latex" variant so figures build on machines without a LaTeX
+# install (e.g. cloud/RunPod GPU boxes).  If scienceplots is missing we fall back
+# gracefully to plain matplotlib + our IEEE_RC overrides.
+
+_SCIENCEPLOTS_STYLES: Optional[list] = None   # resolved once, cached
+
+
+def scienceplots_styles() -> list:
+    """Return the best available scienceplots style list, or [] if unavailable."""
+    global _SCIENCEPLOTS_STYLES
+    if _SCIENCEPLOTS_STYLES is not None:
+        return _SCIENCEPLOTS_STYLES
+
+    styles: list = []
+    try:
+        import scienceplots  # noqa: F401  (importing registers the styles)
+        for candidate in (["science", "ieee", "no-latex"],
+                          ["science", "no-latex"],
+                          ["science"]):
+            try:
+                with plt.style.context(candidate):
+                    pass
+                styles = candidate
+                break
+            except Exception:
+                continue
+    except Exception:
+        styles = []
+
+    _SCIENCEPLOTS_STYLES = styles
+    return styles
+
+
 @contextmanager
 def ieee_style():
-    """Context manager: apply IEEE rcParams, then restore previous settings."""
-    with plt.rc_context(IEEE_RC):
-        yield
+    """Context manager: scienceplots base + IEEE rcParams, restored on exit."""
+    styles = scienceplots_styles()
+    if styles:
+        with plt.style.context(styles), plt.rc_context(IEEE_RC):
+            yield
+    else:
+        with plt.rc_context(IEEE_RC):
+            yield
 
 
 def apply_ieee_style() -> None:
-    """Apply IEEE rcParams globally for the current process."""
+    """Apply scienceplots base + IEEE rcParams globally for the current process."""
+    styles = scienceplots_styles()
+    if styles:
+        try:
+            plt.style.use(styles)
+        except Exception:
+            pass
     mpl.rcParams.update(IEEE_RC)
 
 
