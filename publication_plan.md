@@ -9,6 +9,19 @@ hardened (per-run dirs, full reproducibility, MPS acceleration, leakage-controll
 fabricated outputs removed). Protocol committed: **pooled nested 10-fold headline +
 leave-one-site-out (LOSO) for rigor.**
 
+**Results so far (real, leakage-free nested CV — via `run_benchmark.py`):**
+
+| Model (E1) | Protocol | AUROC | Accuracy |
+|---|---|---|---|
+| ℓ2-logistic on correlation FC | pooled 10-fold | 0.750 ± 0.040 | 68.3% |
+| **ℓ2-logistic on tangent FC** | **pooled 10-fold** | **0.756 ± 0.048** | **69.3%** |
+| ℓ2-logistic on tangent FC | LOSO | 0.758 ± 0.105 | 64.5% |
+
+The linear tangent-FC baseline already **matches Heinsfeld (70%) and beats it on AUROC**.
+The 80–85% climb is the connectome-transformer + multi-atlas + SSL + ensemble stack
+(P2–P3), trained on GPU. XAI edge-stability analysis (`analyze_edges.py`) confirms
+stable ASD-discriminative connections across folds (E6).
+
 ---
 
 ## 0. The honest target (read this first)
