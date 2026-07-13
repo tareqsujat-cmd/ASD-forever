@@ -56,20 +56,38 @@ else:
 PY
 
 echo "==> [5/6] Data (download + preprocess, or unzip prepared data)"
+# ATLASES controls which ROI time series to fetch.  CC200 is required (FC pipeline
+# + single-atlas benchmark); AAL + HO are needed for the multi-atlas SOTA run
+# (train_sota.py).  Set ATLASES="cc200" to skip the extra atlases.
+ATLASES="${ATLASES:-cc200 aal ho}"
+declare -A ATLAS_SUFFIX=( [cc200]=rois_cc200 [aal]=rois_aal [ho]=rois_ho )
+
 if [ -f "abide_processed/mri/metadata.csv" ]; then
-  echo "    abide_processed/ already present — skipping."
+  echo "    abide_processed/ already present."
 elif [ -f "abide_processed.zip" ]; then
-  echo "    Found abide_processed.zip — unzipping (skips download + preprocess)."
+  echo "    Found abide_processed.zip — unzipping (skips CC200 download + preprocess)."
   unzip -q -o abide_processed.zip
 else
   echo "    Downloading ABIDE-I CC200 ROI time series (~340 MB)…"
   python data/download_abide.py --data_dir ./abide_raw --pipeline cpac --atlas rois_cc200
-  echo "    Preprocessing -> 19,900-d FC vectors + 6 phenotypics…"
+  echo "    Preprocessing CC200 -> 19,900-d FC vectors + 6 phenotypics…"
   python data/preprocess_abide.py \
     --pheno_csv ./abide_raw/ABIDE_pcp/Phenotypic_V1_0b_preprocessed1.csv \
     --ts_dir    ./abide_raw/ABIDE_pcp/cpac/filt_noglobal \
     --atlas rois_cc200 --out_dir ./abide_processed --n_jobs 4 --resume
 fi
+
+# Extra atlases for the multi-atlas SOTA run (raw time series only — no preprocess).
+for a in $ATLASES; do
+  suffix="${ATLAS_SUFFIX[$a]}"
+  [ "$a" = "cc200" ] && continue
+  if ls ./abide_raw/ABIDE_pcp/cpac/filt_noglobal/*_"$suffix".1D >/dev/null 2>&1; then
+    echo "    atlas $a already downloaded."
+  else
+    echo "    Downloading atlas $a ($suffix)…"
+    python data/download_abide.py --data_dir ./abide_raw --pipeline cpac --atlas "$suffix"
+  fi
+done
 
 echo "==> [6/6] Sanity check"
 python - <<'PY'

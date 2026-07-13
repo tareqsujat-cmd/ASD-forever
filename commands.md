@@ -150,5 +150,19 @@ python analyze_edges.py --n_folds 10 --top_k 50 --run_name explainability_edges
 # -> results/<run>/edges/{top_edges.csv, edge_importance.png, edge_report.json}
 ```
 
-**Still to build (publication_plan.md §4):** multi-atlas download+fusion (E2.3),
-in-fold ComBat (E2.4), ensemble (E2.6), DeLong/McNemar (E5), ABIDE-II external (E7).
+**E2 full — multi-atlas + SSL + ensemble SOTA push (one command, GPU):**
+```bash
+# 1. Fetch the extra atlases (CC200 + AAL + HO) — once.
+ATLASES="cc200 aal ho" bash setup_runpod.sh
+# 2. Train: per-fold tangent-FC -> SSL masked-connectome pretrain -> fine-tuned
+#    connectome transformer -> multi-atlas x seed ensemble; pooled + LOSO.
+bash run_sota.sh
+#    or tune it:
+ATLASES="cc200 aal ho" SSL_EPOCHS=100 EPOCHS=200 SEEDS=3 COMBAT=1 bash run_sota.sh
+#    -> results/run_N/sota/sota_report.json
+```
+> This is the path to the 80–85% target. Reaching it needs real GPU epochs
+> (SSL 100 + fine-tune 200) across 3 atlases × folds × seeds — hours on one GPU.
+
+**Still to build (publication_plan.md §4):** DeLong/McNemar significance (E5),
+ABIDE-II external validation (E7).

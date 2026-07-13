@@ -59,3 +59,6 @@ pytest-cov>=4.1.0
 # Experiment tracking integrations (used by MLflowCallback / WandBCallback)
 # mlflow>=2.10.0
 # wandb>=0.16.3
+
+# In-fold multi-site harmonization for train_sota.py --combat (optional)
+# neuroCombat>=0.2.12
