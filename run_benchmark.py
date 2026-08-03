@@ -213,8 +213,14 @@ def run_protocol(
     seed: int,
     inner_folds: int = 3,
     C_grid: Optional[List[float]] = None,
+    tangent_device: Optional[str] = None,
 ) -> Dict:
-    """Nested CV for one (metric, protocol). Returns metrics + OOF predictions."""
+    """Nested CV for one (metric, protocol). Returns metrics + OOF predictions.
+
+    If ``tangent_device`` starts with 'cuda' and kind=='tangent', the tangent FC
+    is computed with the GPU-accelerated backend (gpu_tangent.GPUTangentFC) instead
+    of nilearn — numerically identical, faster.  Covariances are cached once.
+    """
     from sklearn.linear_model import LogisticRegression
     from sklearn.model_selection import GridSearchCV, StratifiedKFold
     from sklearn.preprocessing import StandardScaler
@@ -223,14 +229,25 @@ def run_protocol(
     C_grid = C_grid or [0.001, 0.01, 0.1, 1.0]
     splits, _ = _outer_splits(protocol, y, sites, n_folds, seed)
 
+    gpu_tan, covs = None, None
+    if kind == "tangent" and tangent_device and str(tangent_device).startswith("cuda"):
+        from gpu_tangent import GPUTangentFC
+        gpu_tan = GPUTangentFC(device=tangent_device, max_iter=10)
+        covs = gpu_tan.compute_covariances(ts_list)     # once, fold-independent
+
     oof_true, oof_prob, oof_site = [], [], []
     fold_metrics: List[Dict[str, float]] = []
     t0 = time.time()
 
     for k, (tr, te) in enumerate(splits):
-        cm = _connectivity(kind)
-        Xtr = cm.fit_transform([ts_list[i] for i in tr])   # reference fit on TRAIN only
-        Xte = cm.transform([ts_list[i] for i in te])
+        if gpu_tan is not None:
+            gpu_tan.fit(covs[tr])                        # reference on TRAIN only
+            Xtr = gpu_tan.transform(covs[tr])
+            Xte = gpu_tan.transform(covs[te])
+        else:
+            cm = _connectivity(kind)
+            Xtr = cm.fit_transform([ts_list[i] for i in tr])   # reference fit on TRAIN only
+            Xte = cm.transform([ts_list[i] for i in te])
 
         pipe = Pipeline([
             ("scaler", StandardScaler()),
@@ -440,7 +457,8 @@ def main() -> None:
                 res = run_protocol_torch(ts_list, y, sites, kind, proto, args.n_folds,
                                          args.seed, device=args.device, epochs=args.epochs)
             else:
-                res = run_protocol(ts_list, y, sites, kind, proto, args.n_folds, args.seed)
+                res = run_protocol(ts_list, y, sites, kind, proto, args.n_folds, args.seed,
+                                   tangent_device=args.device)
                 res["permutation_p"] = permutation_pvalue(
                     ts_list, y, sites, kind, proto, args.n_folds, args.seed, args.n_perm)
             res.setdefault("permutation_p", None)

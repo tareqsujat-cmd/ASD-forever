@@ -212,13 +212,32 @@ def run(ts_by_atlas, y, sites, atlases, protocol, n_folds, seed,
     fold_metrics: List[Dict[str, float]] = []
     t0 = time.time()
 
+    # GPU-accelerated tangent: precompute covariances ONCE per atlas (they are
+    # fold-independent); per fold, only the geometric-mean reference + projection
+    # run on GPU.  Numerically identical to nilearn (validated), much faster.
+    gpu_tan = None
+    covs_by_atlas: Dict[str, np.ndarray] = {}
+    if kind == "tangent" and str(device).startswith("cuda"):
+        from gpu_tangent import GPUTangentFC
+        gpu_tan = GPUTangentFC(device=device, max_iter=10)
+        for a in atlases:
+            tc = time.time()
+            covs_by_atlas[a] = gpu_tan.compute_covariances(ts_by_atlas[a])
+            logger.info("precomputed %s covariances (%d subj) in %.1fs",
+                        a, len(covs_by_atlas[a]), time.time() - tc)
+
     for k, (tr, te) in enumerate(splits):
         member_probs = []                      # one per (atlas, seed)
         for a in atlases:
             n_rois = ATLAS_INFO[a][1]
-            cm = _connectivity(kind)
-            Xtr = cm.fit_transform([ts_by_atlas[a][i] for i in tr])   # fit on TRAIN
-            Xte = cm.transform([ts_by_atlas[a][i] for i in te])
+            if gpu_tan is not None:
+                gpu_tan.fit(covs_by_atlas[a][tr])         # reference on TRAIN only
+                Xtr = gpu_tan.transform(covs_by_atlas[a][tr])
+                Xte = gpu_tan.transform(covs_by_atlas[a][te])
+            else:
+                cm = _connectivity(kind)
+                Xtr = cm.fit_transform([ts_by_atlas[a][i] for i in tr])   # fit on TRAIN
+                Xte = cm.transform([ts_by_atlas[a][i] for i in te])
             sc = StandardScaler().fit(Xtr)
             Xtr, Xte = sc.transform(Xtr), sc.transform(Xte)
             if use_combat:
