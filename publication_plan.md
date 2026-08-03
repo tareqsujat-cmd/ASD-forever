@@ -86,6 +86,90 @@ explainability validated against ASD neurobiology."*
 
 ---
 
+## 2b. Novelty: contributions + required component upgrades
+
+**Honest premise.** The individual building blocks are established — tangent-FC (Dadi
+2019), connectome transformers (BrainNetTF/METAFormer), masked SSL (METAFormer),
+multi-atlas fusion (MADE-for-ASD), ensembling. A paper claiming "new architecture" from
+these alone is rejectable. Our novelty is in **how we upgrade each block and combine
+them**, and each claim is **earned by an ablation**, never assumed.
+
+### 2b.1 — The three core novel contributions
+
+**C1 — Learned site-adversarial harmonization *inside* the connectome transformer.**
+- *Gap:* multi-site generalization — the reason pooled (~75%) collapses to LOSO (~65%);
+  everyone patches it with ComBat as preprocessing.
+- *Novelty:* a gradient-reversal **site-discriminator branch** making the representation
+  **site-invariant but diagnosis-preserving, end-to-end**, jointly with tangent-FC + SSL —
+  learned, not preprocessing.
+- *Provable superiority:* shrinks the **pooled↔LOSO gap** and drops a **site-decodability**
+  metric — a headline no soft-vote paper can show.
+- *Prior/honesty:* adversarial site-invariance exists in isolation; novelty = the
+  integration + rigorous LOSO-gap demonstration. Fallback narrative: if it only matches
+  ComBat, the finding is "learned harmonization ≈ ComBat but interpretable" (still valid).
+
+**C2 — Cross-atlas contrastive self-supervision + per-subject learned atlas fusion.**
+- *Gap:* multi-atlas is currently naive concat / soft-vote with fixed equal weights.
+- *Novelty:* pretrain so the **same subject under different parcellations (CC200/AAL/HO)
+  is a positive pair** → an **atlas-invariant** connectome representation, then fuse with
+  **learned per-subject atlas attention** (not averaging). Strongest pure-novelty piece.
+- *Superiority:* ablate vs. soft-vote and single-atlas; show learned fusion wins and the
+  representations align across atlases.
+
+**C3 — Counterfactual connectome explanations, neurobiologically validated.**
+- *Gap:* interpretability here is shallow (saliency/attention, rarely validated).
+- *Novelty:* compute the **minimal set of connections whose change flips ASD→TC** (a
+  sparse, causal-flavored counterfactual on the connectome), then show those edges are
+  **stable across folds and concordant with known ASD circuitry** (DMN hypoconnectivity,
+  salience). Turns the paper into a biomarker paper.
+
+Together: **generalizes better (C1), represents better (C2), explains better (C3)** —
+three axes, not one number.
+
+**Optional C4 (higher risk, high clinical appeal) — ASD-subtype discovery:** a
+prototype/mixture layer that discovers connectivity subtypes and reports subtype-specific
+signatures (ASD is heterogeneous).
+
+### 2b.2 — Required upgrades per component (what to actually change)
+
+| Component | Weakness to fix | Upgrade to build | Feeds |
+|---|---|---|---|
+| Tangent-FC | single global reference → poor for outlier sites/subjects | **site-conditional / learnable mixture of SPD references** | C1 |
+| Connectome transformer | ROIs as unordered set; dense attention on a modular system | **network-structured hierarchical attention + anatomical (MNI/Yeo) positional encoding** | C2/C3 |
+| Masked SSL | random-value masking is trivially inpainted | **whole-network masking** (hide a community, reconstruct it) | C2 |
+| Multi-atlas fusion | independent atlases, fixed equal weights | **cross-atlas contrastive pretraining + learned per-subject fusion** | C2 |
+| Ensembling | unweighted, uncalibrated, cannot abstain | **uncertainty-weighted, site-conditional calibration + selective prediction** | rigor |
+| Site confound (cross-cutting) | model learns site, not biology | **adversarial gradient-reversal site-invariance** | C1 |
+
+Unified target architecture (**GRACE** — Geometry-aware, Riemannian, Atlas-invariant,
+Community-structured, sitE-invariant): `covariance → mixture-of-references tangent →
+network-structured hierarchical attention (+anatomical PE) → cross-atlas contrastive +
+network-masking SSL → learned cross-atlas fusion → adversarial site-invariance →
+classifier + counterfactual explainer → calibrated selective prediction`. **Every arrow
+is an ablation row** — the results table *is* the novelty argument.
+
+### 2b.3 — Does federated learning help?
+
+**Not for accuracy, and not in the core paper.** ABIDE is already public and centralized,
+so FL's privacy motivation is moot on this benchmark; and on non-IID multi-site data FL
+typically **slightly hurts** accuracy vs. centralized. It is *not* an accuracy lever, so
+bolting it on would dilute the SOTA story. **Where it is legitimate:** as a **future-work /
+deployment** framing that pairs naturally with C1 — *federated domain generalization*,
+where hospitals collaboratively train a site-invariant model **without sharing raw fMRI**.
+That is a compelling follow-up paper (privacy-preserving collaborative ASD screening),
+best simulated with each ABIDE site as a client, but its contribution would be "we can do
+this privately," not "we do it more accurately." **Recommendation:** one paragraph in
+Discussion/Future Work, not a contribution.
+
+### 2b.4 — Sequencing
+
+Base multi-atlas SSL ensemble (training now) → confirm competitive (~75–80%) →
+**C2** (biggest novelty, cheapest, additive) → **C1** (biggest "superior" claim) →
+**C3** (interpretability) → optional **C4**. Each lands as an ablatable module; a module
+that fails its ablation becomes an honest negative result, not a forced win.
+
+---
+
 ## 3. Evaluation protocol (locks legitimacy)
 
 - **Headline:** pooled, subject-independent, **nested** stratified **10-fold** (inner loop

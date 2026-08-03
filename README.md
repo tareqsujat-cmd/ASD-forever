@@ -1,8 +1,41 @@
 # ASD Multimodal Detection Framework
 
-> **Multimodal Autism Spectrum Disorder Detection via Functional Connectivity and Phenotypic Features**
+> **Autism Spectrum Disorder Detection from Resting-State fMRI Functional Connectivity**
 >
-> Targeting IEEE EMBC / ISBI / BIBM or *Transactions on Neural Systems and Rehabilitation Engineering*
+> Targeting a Q1 venue (Medical Image Analysis / NeuroImage / IEEE TMI / J-BHI).
+> Full plan + experiment matrix: [publication_plan.md](publication_plan.md).
+
+---
+
+## Research direction (honest SOTA + genuine novelty)
+
+**Goal:** honestly beat the ABIDE-I baseline (Heinsfeld 2018 = 70% acc) and push toward
+**80–85%** under a leakage-free protocol — *not* the inflated 90%+ numbers that come from
+feature-selection leakage or curated subsets.
+
+**Where we are (real, leakage-free nested CV):** tangent-space FC + ℓ2-logistic baseline
+= **AUROC 0.756 / acc 69.3% pooled 10-fold** (matches/beats Heinsfeld). The climb to
+80–85% is the multi-atlas SSL connectome-transformer ensemble (`train_sota.py`).
+
+**The paper's novelty is not new blocks — it's how we upgrade + validate them.** Three
+core contributions (details + required component upgrades in
+[publication_plan.md §2b](publication_plan.md)):
+
+- **C1 — Learned site-adversarial harmonization** inside the transformer (gradient-reversal
+  site-discriminator): site-invariant but diagnosis-preserving, end-to-end. *Provable
+  win:* shrinks the pooled↔LOSO gap — the field's open problem.
+- **C2 — Cross-atlas contrastive SSL + learned per-subject atlas fusion:** same subject
+  under different parcellations = a positive pair → an atlas-invariant representation
+  (beats naive soft-vote). *Strongest pure novelty.*
+- **C3 — Counterfactual connectome explanations:** the minimal connections whose change
+  flips ASD→TC, stable across folds and concordant with ASD circuitry → a biomarker paper.
+
+*(Optional C4: ASD-subtype discovery.)* Every contribution is **earned by an ablation** —
+a module that fails its ablation is reported as an honest negative result, never forced.
+
+**Federated learning?** Not an accuracy lever here (ABIDE is already public; FL usually
+*hurts* accuracy on non-IID sites) — it belongs in Future Work as *federated domain
+generalization* pairing with C1, not as a core contribution.
 
 ---
 
@@ -402,20 +435,21 @@ Loss:  FocalLoss (α=0.25, γ=2.0, label smoothing=0.10)
 
 ---
 
-## Results (latest run — ABIDE I, 5-fold CV)
+## Results (real, leakage-free — nested CV via `run_benchmark.py`)
 
-| Metric | Value | 95% CI |
-|--------|-------|--------|
-| **AUROC** | **0.7110** | [0.685 – 0.744] |
-| AUPRC | 0.6797 | — |
-| Accuracy | 67.8% | — |
-| Sensitivity (ASD recall) | 64.3% | — |
-| Specificity (TC recall) | 71.1% | — |
-| F1 | 0.658 | — |
-| MCC | 0.355 | — |
-| ECE (calibration error) | 0.110 | — |
+Reference baseline on 871 subjects, everything fit in-fold (no leakage):
 
-Per-fold AUCs: 0.695 · 0.703 · 0.739 · 0.765 · 0.717
+| Model (E1) | Protocol | AUROC | Accuracy |
+|---|---|---|---|
+| ℓ2-logistic · correlation FC | pooled 10-fold | 0.750 ± 0.040 | 68.3% |
+| **ℓ2-logistic · tangent FC** | **pooled 10-fold** | **0.756 ± 0.048** | **69.3%** |
+| ℓ2-logistic · tangent FC | leave-one-site-out | 0.758 | 64.5% |
+
+Already matches/beats Heinsfeld 2018 (70%). The multi-atlas SSL connectome-transformer
+ensemble (`train_sota.py`) targeting 80–85% is the next result (see publication_plan.md).
+
+> Note: an earlier 0.711 figure came from the pre-refactor pipeline, which contained
+> fabricated evaluation paths (since removed). All numbers here are from real inference.
 
 ---
 

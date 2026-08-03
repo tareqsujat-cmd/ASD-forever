@@ -19,7 +19,9 @@ VENV=".venv"
 
 echo "==> [1/6] Python virtual environment"
 if [ ! -d "$VENV" ]; then
-  "$PYTHON" -m venv "$VENV"
+  # --system-site-packages inherits the pod's preinstalled CUDA PyTorch, so we
+  # don't re-download ~3 GB of CUDA wheels (RunPod PyTorch templates ship torch).
+  "$PYTHON" -m venv --system-site-packages "$VENV"
 fi
 # shellcheck disable=SC1091
 source "$VENV/bin/activate"
