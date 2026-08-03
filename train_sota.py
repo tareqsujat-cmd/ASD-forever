@@ -187,7 +187,7 @@ def _finetune(fc_tr, y_tr, fc_va, y_va, ae, n_rois, d_model, epochs, device, see
                 break
     if best_state is not None:
         clf.load_state_dict(best_state)
-    return clf
+    return clf, float(best_auc)
 
 
 def _predict(clf, fc, device):
@@ -198,18 +198,40 @@ def _predict(clf, fc, device):
                              dim=-1)[:, 1].cpu().numpy()
 
 
+def _save_member(ckpt_dir, fold, atlas, seed_i, n_rois, d_model,
+                 clf, scaler, tangent_ref, val_auc, kind) -> dict:
+    """Export one ensemble member: model weights + the scaler + tangent reference
+    needed to featurize new data, plus metadata.  Enables full inference reload."""
+    import torch
+    ckpt_dir = Path(ckpt_dir); ckpt_dir.mkdir(parents=True, exist_ok=True)
+    name = f"fold{fold}_{atlas}_seed{seed_i}.pt"
+    payload = {
+        "model_state": {k: v.detach().cpu() for k, v in clf.state_dict().items()},
+        "arch": {"n_rois": int(n_rois), "d_model": int(d_model), "n_heads": 4, "n_layers": 2},
+        "scaler_mean": np.asarray(scaler.mean_, dtype=np.float32),
+        "scaler_scale": np.asarray(scaler.scale_, dtype=np.float32),
+        "tangent_reference": (tangent_ref.detach().cpu() if tangent_ref is not None else None),
+        "connectivity": kind, "atlas": atlas,
+        "fold": int(fold), "seed": int(seed_i), "val_auc": float(val_auc),
+    }
+    torch.save(payload, ckpt_dir / name)
+    return {"file": name, "fold": int(fold), "atlas": atlas,
+            "seed": int(seed_i), "val_auc": float(val_auc)}
+
+
 # ---------------------------------------------------------------------------
 # One protocol: nested CV with multi-atlas x seed ensemble
 # ---------------------------------------------------------------------------
 
 def run(ts_by_atlas, y, sites, atlases, protocol, n_folds, seed,
-        ssl_epochs, epochs, seeds, kind, device, use_combat):
+        ssl_epochs, epochs, seeds, kind, device, use_combat, ckpt_dir=None):
     from sklearn.preprocessing import StandardScaler
     from sklearn.model_selection import StratifiedKFold
 
     splits, _ = _outer_splits(protocol, y, sites, n_folds, seed)
     oof_true, oof_prob, oof_site = [], [], []
     fold_metrics: List[Dict[str, float]] = []
+    members: List[dict] = []               # saved-checkpoint manifest entries
     t0 = time.time()
 
     # GPU-accelerated tangent: precompute covariances ONCE per atlas (they are
@@ -248,9 +270,13 @@ def run(ts_by_atlas, y, sites, atlases, protocol, n_folds, seed,
             for s in range(seeds):
                 ae = _pretrain_ssl(Xtr[itr], n_rois, 128, ssl_epochs, device, seed + s) \
                     if ssl_epochs > 0 else None
-                clf = _finetune(Xtr[itr], y[tr][itr], Xtr[iva], y[tr][iva],
-                                ae, n_rois, 128, epochs, device, seed + s)
+                clf, mem_auc = _finetune(Xtr[itr], y[tr][itr], Xtr[iva], y[tr][iva],
+                                         ae, n_rois, 128, epochs, device, seed + s)
                 member_probs.append(_predict(clf, Xte, device))
+                if ckpt_dir is not None:
+                    ref = gpu_tan.reference_ if gpu_tan is not None else None
+                    members.append(_save_member(ckpt_dir, k, a, s, n_rois, 128,
+                                                clf, sc, ref, mem_auc, kind))
             logger.info("  fold %d/%d atlas=%s done", k + 1, len(splits), a)
 
         prob = np.mean(member_probs, axis=0)                 # ensemble
@@ -259,6 +285,16 @@ def run(ts_by_atlas, y, sites, atlases, protocol, n_folds, seed,
         fm = _metrics(y[te], prob); fold_metrics.append(fm)
         logger.info("  [ensemble/%s] fold %2d/%d  AUROC=%.3f acc=%.3f (%d members)",
                     protocol, k + 1, len(splits), fm["auroc"], fm["accuracy"], len(member_probs))
+
+    if ckpt_dir is not None and members:
+        (Path(ckpt_dir) / "manifest.json").write_text(json.dumps({
+            "protocol": protocol, "n_members": len(members),
+            "ensemble": "mean of member probabilities",
+            "reload": "rebuild ConnectomeTransformer(arch); load model_state; "
+                      "featurize new data with tangent_reference + scaler_mean/scale",
+            "members": members,
+        }, indent=2))
+        logger.info("  saved %d checkpoints -> %s", len(members), ckpt_dir)
 
     oof_true = np.array(oof_true); oof_prob = np.array(oof_prob)
     keys = list(fold_metrics[0].keys())
@@ -269,6 +305,7 @@ def run(ts_by_atlas, y, sites, atlases, protocol, n_folds, seed,
         "pooled_oof": _metrics(oof_true, oof_prob),
         "ci": _bootstrap_ci(oof_true, oof_prob, seed=seed),
         "elapsed_s": round(time.time() - t0, 1),
+        "n_checkpoints": len(members),
         "oof_true": oof_true.tolist(), "oof_prob": oof_prob.tolist(), "oof_site": oof_site,
     }
 
@@ -325,7 +362,8 @@ def main() -> None:
     for proto in protocols:
         logger.info("=== multi-atlas SSL ensemble | %s | atlases=%s ===", proto, args.atlases)
         res = run(ts_by_atlas, y, sites, args.atlases, proto, args.n_folds, args.seed,
-                  args.ssl_epochs, args.epochs, args.seeds, args.kind, args.device, args.combat)
+                  args.ssl_epochs, args.epochs, args.seeds, args.kind, args.device, args.combat,
+                  ckpt_dir=out / "checkpoints" / proto)
         results.append(res)
         m, s = res["fold_mean"], res["fold_std"]
         logger.info("  >>> %s: AUROC %.3f+/-%.3f  acc %.3f+/-%.3f  sens %.3f spec %.3f",
@@ -338,7 +376,35 @@ def main() -> None:
         [{"protocol": r["protocol"], "oof_true": r["oof_true"],
           "oof_prob": r["oof_prob"], "oof_site": r["oof_site"]} for r in results], indent=2))
     update_manifest(run_dir, {"results": compact})
-    logger.info("Report -> %s", out / "sota_report.json")
+
+    # --- Figures: all scienceplots-styled, written into the same run directory ---
+    figdir = out / "figures"
+    try:
+        import viz_results as VR
+        figdir.mkdir(parents=True, exist_ok=True)
+        for r in results:
+            proto = r["protocol"]
+            yv = np.asarray(r["oof_true"]); pv = np.asarray(r["oof_prob"], dtype=float)
+            sv = np.asarray(r["oof_site"])
+            if len(yv) == 0 or len(set(yv)) < 2:
+                continue
+            VR.fig_roc(yv, pv, proto, figdir); VR.fig_pr(yv, pv, proto, figdir)
+            VR.fig_calibration(yv, pv, proto, figdir); VR.fig_confusion(yv, pv, proto, figdir)
+            if len(sv) == len(yv):
+                VR.fig_per_site(yv, pv, sv, proto, figdir)
+        # comparison vs best legitimate SOTA (use the pooled result if present)
+        head = next((r for r in results if r["protocol"] == "pooled"), results[0])
+        from viz_compare import plot_sota_comparison
+        plot_sota_comparison(head["fold_mean"]["accuracy"], figdir,
+                             our_auroc=head["fold_mean"]["auroc"])
+        logger.info("Figures (scienceplots) -> %s", figdir)
+    except Exception as exc:
+        logger.warning("Figure generation failed (%s) — results still saved.", exc)
+
+    logger.info("Run directory: %s", run_dir)
+    logger.info("  report:      %s", out / "sota_report.json")
+    logger.info("  checkpoints: %s", out / "checkpoints")
+    logger.info("  figures:     %s", figdir)
 
 
 if __name__ == "__main__":

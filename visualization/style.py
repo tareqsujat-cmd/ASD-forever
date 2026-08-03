@@ -27,24 +27,38 @@ FIG_HEIGHT   = 2.6     # default single-panel height
 # ---------------------------------------------------------------------------
 # rcParams for IEEE Transactions style
 # ---------------------------------------------------------------------------
+# Publication rcParams overlaid on the scienceplots base.  Tuned for a bolder,
+# high-impact "Q1 / ICLR-style" look: thicker lines, larger readable fonts, and
+# crisp axes — while staying vector/PDF and colour-blind-safe.
 IEEE_RC: dict = {
-    "font.family":       "serif",
-    "font.size":         9,
-    "axes.labelsize":    9,
-    "axes.titlesize":    9,
-    "xtick.labelsize":   8,
-    "ytick.labelsize":   8,
-    "legend.fontsize":   8,
-    "legend.framealpha": 0.85,
-    "lines.linewidth":   1.4,
-    "axes.linewidth":    0.8,
-    "grid.linewidth":    0.5,
-    "grid.alpha":        0.35,
-    "axes.grid":         True,
-    "figure.dpi":        150,   # screen; overridden at savefig time
-    "savefig.dpi":       300,
-    "savefig.bbox":      "tight",
-    "savefig.pad_inches": 0.03,
+    "font.family":        "serif",
+    "font.size":          11,
+    "axes.labelsize":     12,
+    "axes.titlesize":     12,
+    "axes.titleweight":   "bold",
+    "axes.labelweight":   "bold",
+    "xtick.labelsize":    10,
+    "ytick.labelsize":    10,
+    "legend.fontsize":    10,
+    "legend.framealpha":  0.9,
+    "legend.edgecolor":   "0.3",
+    "lines.linewidth":    2.2,     # thicker lines (Q1/ICLR)
+    "lines.markersize":   6.0,
+    "lines.markeredgewidth": 1.2,
+    "patch.linewidth":    1.2,
+    "axes.linewidth":     1.1,     # crisper axis spines
+    "xtick.major.width":  1.1,
+    "ytick.major.width":  1.1,
+    "xtick.major.size":   4.5,
+    "ytick.major.size":   4.5,
+    "grid.linewidth":     0.7,
+    "grid.alpha":         0.35,
+    "axes.grid":          True,
+    "axes.axisbelow":     True,
+    "figure.dpi":         150,     # screen; overridden at savefig time
+    "savefig.dpi":        400,
+    "savefig.bbox":       "tight",
+    "savefig.pad_inches": 0.04,
 }
 
 # ---------------------------------------------------------------------------
