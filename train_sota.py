@@ -224,7 +224,8 @@ def _save_member(ckpt_dir, fold, atlas, seed_i, n_rois, d_model,
 # ---------------------------------------------------------------------------
 
 def run(ts_by_atlas, y, sites, atlases, protocol, n_folds, seed,
-        ssl_epochs, epochs, seeds, kind, device, use_combat, ckpt_dir=None):
+        ssl_epochs, epochs, seeds, kind, device, use_combat, ckpt_dir=None,
+        model="transformer"):
     from sklearn.preprocessing import StandardScaler
     from sklearn.model_selection import StratifiedKFold
 
@@ -265,18 +266,28 @@ def run(ts_by_atlas, y, sites, atlases, protocol, n_folds, seed,
             if use_combat:
                 Xtr, Xte = _combat_infold(Xtr, Xte, sites[tr], sites[te])
 
-            inner = StratifiedKFold(n_splits=5, shuffle=True, random_state=seed)
-            itr, iva = next(inner.split(Xtr, y[tr]))
-            for s in range(seeds):
-                ae = _pretrain_ssl(Xtr[itr], n_rois, 128, ssl_epochs, device, seed + s) \
-                    if ssl_epochs > 0 else None
-                clf, mem_auc = _finetune(Xtr[itr], y[tr][itr], Xtr[iva], y[tr][iva],
-                                         ae, n_rois, 128, epochs, device, seed + s)
-                member_probs.append(_predict(clf, Xte, device))
-                if ckpt_dir is not None:
-                    ref = gpu_tan.reference_ if gpu_tan is not None else None
-                    members.append(_save_member(ckpt_dir, k, a, s, n_rois, 128,
-                                                clf, sc, ref, mem_auc, kind))
+            if model == "logreg":
+                # Multi-atlas LINEAR ensemble member: in-fold nested C, one per atlas.
+                from sklearn.linear_model import LogisticRegression
+                from sklearn.model_selection import GridSearchCV
+                gs = GridSearchCV(
+                    LogisticRegression(solver="liblinear", max_iter=2000),
+                    {"C": [0.001, 0.01, 0.1, 1.0]}, scoring="roc_auc", cv=3, n_jobs=-1)
+                gs.fit(Xtr, y[tr])
+                member_probs.append(gs.predict_proba(Xte)[:, 1])
+            else:
+                inner = StratifiedKFold(n_splits=5, shuffle=True, random_state=seed)
+                itr, iva = next(inner.split(Xtr, y[tr]))
+                for s in range(seeds):
+                    ae = _pretrain_ssl(Xtr[itr], n_rois, 128, ssl_epochs, device, seed + s) \
+                        if ssl_epochs > 0 else None
+                    clf, mem_auc = _finetune(Xtr[itr], y[tr][itr], Xtr[iva], y[tr][iva],
+                                             ae, n_rois, 128, epochs, device, seed + s)
+                    member_probs.append(_predict(clf, Xte, device))
+                    if ckpt_dir is not None:
+                        ref = gpu_tan.reference_ if gpu_tan is not None else None
+                        members.append(_save_member(ckpt_dir, k, a, s, n_rois, 128,
+                                                    clf, sc, ref, mem_auc, kind))
             logger.info("  fold %d/%d atlas=%s done", k + 1, len(splits), a)
 
         prob = np.mean(member_probs, axis=0)                 # ensemble
@@ -333,6 +344,8 @@ def main() -> None:
     p.add_argument("--atlases", nargs="+", default=["cc200", "aal", "ho"],
                    choices=list(ATLAS_INFO.keys()))
     p.add_argument("--kind", default="tangent", choices=["tangent", "correlation"])
+    p.add_argument("--model", default="transformer", choices=["transformer", "logreg"],
+                   help="logreg = multi-atlas linear tangent-FC ensemble (strong baseline)")
     p.add_argument("--protocol", default="pooled", choices=["pooled", "loso", "both"])
     p.add_argument("--n_folds", type=int, default=10)
     p.add_argument("--ssl_epochs", type=int, default=100, help="0 = no SSL pretraining")
@@ -363,7 +376,7 @@ def main() -> None:
         logger.info("=== multi-atlas SSL ensemble | %s | atlases=%s ===", proto, args.atlases)
         res = run(ts_by_atlas, y, sites, args.atlases, proto, args.n_folds, args.seed,
                   args.ssl_epochs, args.epochs, args.seeds, args.kind, args.device, args.combat,
-                  ckpt_dir=out / "checkpoints" / proto)
+                  ckpt_dir=out / "checkpoints" / proto, model=args.model)
         results.append(res)
         m, s = res["fold_mean"], res["fold_std"]
         logger.info("  >>> %s: AUROC %.3f+/-%.3f  acc %.3f+/-%.3f  sens %.3f spec %.3f",
