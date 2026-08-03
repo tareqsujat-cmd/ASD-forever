@@ -27,6 +27,15 @@ Usage
 
 from __future__ import annotations
 
+# Cap BLAS threads BEFORE numpy is imported.  On many-core boxes (e.g. a 64-vCPU
+# RunPod), OpenBLAS/MKL otherwise spawn one thread per core for every tiny
+# 200x200 matrix op in the tangent geometric-mean loop, and the thread-thrashing
+# overhead makes the CPU tangent step ~10x slower.  Override via env if needed.
+import os as _os
+for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
+           "NUMEXPR_NUM_THREADS", "VECLIB_MAXIMUM_THREADS"):
+    _os.environ.setdefault(_v, "8")
+
 import argparse
 import json
 import logging

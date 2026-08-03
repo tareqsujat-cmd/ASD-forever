@@ -33,6 +33,13 @@ Outputs a JSON report + console summary under ``results/run_N/benchmark/``.
 
 from __future__ import annotations
 
+# Cap BLAS threads before numpy import — prevents OpenBLAS/MKL thread-thrashing
+# on many-core boxes that makes the CPU tangent geometric-mean step ~10x slower.
+import os as _os
+for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
+           "NUMEXPR_NUM_THREADS", "VECLIB_MAXIMUM_THREADS"):
+    _os.environ.setdefault(_v, "8")
+
 import argparse
 import json
 import logging
