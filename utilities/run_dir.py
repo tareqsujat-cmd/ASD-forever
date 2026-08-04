@@ -53,37 +53,38 @@ def _next_run_index(results_root: Path) -> int:
 
 def create_run_dir(results_root: str | Path, run_name: Optional[str] = None) -> Path:
     """
-    Create and return a fresh run directory under ``results_root``.
+    Create and return a fresh **timestamped** run directory under ``results_root``.
 
-    Parameters
-    ----------
-    results_root : path
-        The results root (e.g. ``results/``).  Created if missing.
-    run_name : str, optional
-        Explicit run directory name.  If given and it already exists, a numeric
-        suffix is appended to avoid clobbering.  If omitted, an auto-incrementing
-        ``run_N`` name is used.
+    Naming: ``results/<YYYY-MM-DD_HH-MM-SS>[_<run_name>]/`` — chronologically
+    sortable and self-describing, so each training run is its own dated folder.
+    A ``results/latest`` symlink is (best-effort) pointed at the new run.
 
-    Returns
-    -------
-    Path to the newly created run directory (guaranteed not to pre-exist).
+    Returns the newly created run directory (guaranteed not to pre-exist).
     """
+    from datetime import datetime
+
     results_root = Path(results_root)
     results_root.mkdir(parents=True, exist_ok=True)
 
-    if run_name:
-        run_dir = results_root / run_name
-        if run_dir.exists():
-            # Never overwrite an existing run — disambiguate with a suffix.
-            i = 2
-            while (results_root / f"{run_name}_{i}").exists():
-                i += 1
-            run_dir = results_root / f"{run_name}_{i}"
-    else:
-        idx = _next_run_index(results_root)
-        run_dir = results_root / f"{RUN_PREFIX}{idx}"
+    ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    base = f"{ts}_{run_name}" if run_name else ts
+    run_dir = results_root / base
+    if run_dir.exists():                      # same-second collision — disambiguate
+        i = 2
+        while (results_root / f"{base}_{i}").exists():
+            i += 1
+        run_dir = results_root / f"{base}_{i}"
 
     run_dir.mkdir(parents=True, exist_ok=False)
+
+    # convenience: results/latest -> most recent run
+    try:
+        link = results_root / "latest"
+        if link.is_symlink() or link.exists():
+            link.unlink()
+        link.symlink_to(run_dir.name)
+    except Exception:
+        pass
     logger.info("Run directory: %s", run_dir.resolve())
     return run_dir
 

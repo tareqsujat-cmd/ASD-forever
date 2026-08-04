@@ -230,9 +230,11 @@ def run_protocol(
     splits, _ = _outer_splits(protocol, y, sites, n_folds, seed)
 
     gpu_tan, covs = None, None
-    if kind == "tangent" and tangent_device and str(tangent_device).startswith("cuda"):
+    if kind == "tangent":
+        # cov-caching tangent backend on any device (CUDA or CPU) — computes
+        # covariances once instead of nilearn recomputing them every fold.
         from gpu_tangent import GPUTangentFC
-        gpu_tan = GPUTangentFC(device=tangent_device, max_iter=10)
+        gpu_tan = GPUTangentFC(device=tangent_device or "cpu", max_iter=10)
         covs = gpu_tan.compute_covariances(ts_list)     # once, fold-independent
 
     oof_true, oof_prob, oof_site = [], [], []

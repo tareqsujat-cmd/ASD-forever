@@ -255,7 +255,10 @@ def run(ts_by_atlas, y, sites, atlases, protocol, n_folds, seed,
     # run on GPU.  Numerically identical to nilearn (validated), much faster.
     gpu_tan = None
     covs_by_atlas: Dict[str, np.ndarray] = {}
-    if kind == "tangent" and str(device).startswith("cuda"):
+    if kind == "tangent":
+        # Use the cov-caching tangent backend on ANY device (CUDA, or CPU on a Mac):
+        # covariances are computed once per atlas instead of nilearn recomputing them
+        # every fold — the main speedup on machines without a CUDA GPU.
         from gpu_tangent import GPUTangentFC
         gpu_tan = GPUTangentFC(device=device, max_iter=10)
         for a in atlases:
