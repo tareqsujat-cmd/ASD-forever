@@ -40,6 +40,10 @@ for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
            "NUMEXPR_NUM_THREADS", "VECLIB_MAXIMUM_THREADS"):
     _os.environ.setdefault(_v, "8")
 
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
+
 import argparse
 import json
 import logging
@@ -241,7 +245,8 @@ def run_protocol(
     fold_metrics: List[Dict[str, float]] = []
     t0 = time.time()
 
-    for k, (tr, te) in enumerate(splits):
+    from tqdm import tqdm
+    for k, (tr, te) in enumerate(tqdm(splits, desc=f"{kind}/{protocol}", unit="fold")):
         if gpu_tan is not None:
             gpu_tan.fit(covs[tr])                        # reference on TRAIN only
             Xtr = gpu_tan.transform(covs[tr])
@@ -253,7 +258,7 @@ def run_protocol(
 
         pipe = Pipeline([
             ("scaler", StandardScaler()),
-            ("clf", LogisticRegression(penalty="l2", solver="liblinear", max_iter=2000)),
+            ("clf", LogisticRegression(solver="liblinear", max_iter=2000)),  # l2 is default
         ])
         inner = StratifiedKFold(n_splits=inner_folds, shuffle=True, random_state=seed)
         gs = GridSearchCV(pipe, {"clf__C": C_grid}, scoring="roc_auc", cv=inner, n_jobs=-1)

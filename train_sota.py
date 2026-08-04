@@ -36,6 +36,10 @@ for _v in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
            "NUMEXPR_NUM_THREADS", "VECLIB_MAXIMUM_THREADS"):
     _os.environ.setdefault(_v, "8")
 
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
+
 import argparse
 import json
 import logging
@@ -267,7 +271,8 @@ def run(ts_by_atlas, y, sites, atlases, protocol, n_folds, seed,
             logger.info("precomputed %s covariances (%d subj) in %.1fs",
                         a, len(covs_by_atlas[a]), time.time() - tc)
 
-    for k, (tr, te) in enumerate(splits):
+    from tqdm import tqdm
+    for k, (tr, te) in enumerate(tqdm(splits, desc=f"{protocol} folds", unit="fold")):
         member_probs = []                      # one per (atlas, seed)
         for a in atlases:
             n_rois = ATLAS_INFO[a][1]
