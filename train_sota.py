@@ -125,6 +125,21 @@ def load_multi_atlas(
 # Torch training: SSL pretrain -> fine-tune
 # ---------------------------------------------------------------------------
 
+def load_phenotype(processed_dir, sids):
+    """Load raw phenotypic features (age, sex, FIQ, VIQ, PIQ, handedness) aligned
+    to ``sids`` -> (n, 6) float array (NaN for missing), or None if unavailable."""
+    gen = Path(processed_dir) / "gen"
+    feats = []
+    for sid in sids:
+        f = gen / f"{sid}_raw.npy"
+        if not f.exists():
+            f = gen / f"{sid}.npy"
+        if not f.exists():
+            return None
+        feats.append(np.load(f).astype(np.float64))
+    return np.stack(feats)
+
+
 def _pretrain_ssl(fc_tr, n_rois, d_model, epochs, device, seed, batch_size=32, lr=3e-4):
     import torch
     from models.connectome_transformer import MaskedConnectomeAutoencoder
@@ -225,7 +240,7 @@ def _save_member(ckpt_dir, fold, atlas, seed_i, n_rois, d_model,
 
 def run(ts_by_atlas, y, sites, atlases, protocol, n_folds, seed,
         ssl_epochs, epochs, seeds, kind, device, use_combat, ckpt_dir=None,
-        model="transformer"):
+        model="transformer", pheno=None):
     from sklearn.preprocessing import StandardScaler
     from sklearn.model_selection import StratifiedKFold
 
@@ -290,6 +305,20 @@ def run(ts_by_atlas, y, sites, atlases, protocol, n_folds, seed,
                                                     clf, sc, ref, mem_auc, kind))
             logger.info("  fold %d/%d atlas=%s done", k + 1, len(splits), a)
 
+        if pheno is not None:
+            # Late-fusion: a phenotype-only logistic member (age/sex/FIQ/VIQ/PIQ/
+            # handedness), fit strictly in-fold.  NEVER site (would leak label prevalence).
+            from sklearn.linear_model import LogisticRegression
+            from sklearn.preprocessing import StandardScaler
+            from sklearn.impute import SimpleImputer
+            from sklearn.model_selection import GridSearchCV
+            imp = SimpleImputer(strategy="median").fit(pheno[tr])
+            psc = StandardScaler().fit(imp.transform(pheno[tr]))
+            pgs = GridSearchCV(LogisticRegression(max_iter=2000),
+                               {"C": [0.01, 0.1, 1.0, 10.0]}, scoring="roc_auc", cv=3, n_jobs=-1)
+            pgs.fit(psc.transform(imp.transform(pheno[tr])), y[tr])
+            member_probs.append(pgs.predict_proba(psc.transform(imp.transform(pheno[te])))[:, 1])
+
         prob = np.mean(member_probs, axis=0)                 # ensemble
         oof_true.extend(y[te].tolist()); oof_prob.extend(prob.tolist())
         oof_site.extend(sites[te].tolist())
@@ -346,6 +375,8 @@ def main() -> None:
     p.add_argument("--kind", default="tangent", choices=["tangent", "correlation"])
     p.add_argument("--model", default="transformer", choices=["transformer", "logreg"],
                    help="logreg = multi-atlas linear tangent-FC ensemble (strong baseline)")
+    p.add_argument("--phenotype", action="store_true",
+                   help="add a phenotype late-fusion ensemble member (age/sex/IQ/handedness)")
     p.add_argument("--protocol", default="pooled", choices=["pooled", "loso", "both"])
     p.add_argument("--n_folds", type=int, default=10)
     p.add_argument("--ssl_epochs", type=int, default=100, help="0 = no SSL pretraining")
@@ -369,6 +400,9 @@ def main() -> None:
 
     ts_by_atlas, y, sites, sids = load_multi_atlas(
         Path(args.processed_dir), Path(args.ts_root), args.atlases)
+    pheno = load_phenotype(args.processed_dir, sids) if args.phenotype else None
+    if pheno is not None:
+        logger.info("phenotype late-fusion enabled: %s features", pheno.shape[1])
 
     protocols = ["pooled", "loso"] if args.protocol == "both" else [args.protocol]
     results = []
@@ -376,7 +410,7 @@ def main() -> None:
         logger.info("=== multi-atlas SSL ensemble | %s | atlases=%s ===", proto, args.atlases)
         res = run(ts_by_atlas, y, sites, args.atlases, proto, args.n_folds, args.seed,
                   args.ssl_epochs, args.epochs, args.seeds, args.kind, args.device, args.combat,
-                  ckpt_dir=out / "checkpoints" / proto, model=args.model)
+                  ckpt_dir=out / "checkpoints" / proto, model=args.model, pheno=pheno)
         results.append(res)
         m, s = res["fold_mean"], res["fold_std"]
         logger.info("  >>> %s: AUROC %.3f+/-%.3f  acc %.3f+/-%.3f  sens %.3f spec %.3f",

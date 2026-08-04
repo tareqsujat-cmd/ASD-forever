@@ -18,9 +18,20 @@ leave-one-site-out (LOSO) for rigor.**
 | ℓ2-logistic on tangent FC | LOSO | 0.758 ± 0.105 | 64.5% |
 
 The linear tangent-FC baseline already **matches Heinsfeld (70%) and beats it on AUROC**.
-The 80–85% climb is the connectome-transformer + multi-atlas + SSL + ensemble stack
-(P2–P3), trained on GPU. XAI edge-stability analysis (`analyze_edges.py`) confirms
-stable ASD-discriminative connections across folds (E6).
+
+> **⚠️ Evidence-driven pivot (this changed the plan).** We built the multi-atlas
+> self-supervised connectome **transformer** — it **underperformed at ~0.62 AUROC**.
+> This is not a bug of ambition: two rigorous benchmarks show **deep models do NOT beat
+> a linear tangent-FC baseline on full ABIDE-I under a fair protocol** (Luo et al. 2025,
+> *Rethinking Functional Brain Connectome Analysis*, arXiv 2501.17207 — LR ≈ MLP ≈
+> BrainNetTF ≈ 0.737, and message-passing *hurts*; PMC11912182 — SVM ≈ GCN, no sig. diff).
+> The honest full-cohort ceiling under fair CV is **~0.80 AUROC**. Published >0.80 numbers
+> use leakier protocols (random splits w/ site leakage, weak baselines, phenotype-in-graph).
+>
+> **So the primary model is now a multi-atlas tangent-linear ensemble + phenotype
+> late-fusion** (the levers MADE-for-ASD's own ablation shows actually pay: multi-atlas
+> +1.8–6.5pp, demographics +1.7pp). Realistic honest target **~0.79–0.81 AUROC**. The
+> connectome transformer is reported as an honest **negative result**, not the headline.
 
 ---
 
@@ -30,10 +41,16 @@ stable ASD-discriminative connections across folds (E6).
 |---|---|---|
 | **Baseline to beat** | Heinsfeld 2018 = **70%** (pooled 10-fold), ~65% LOSO | citable, full cohort |
 | **Credible ceiling (full cohort)** | MADE-for-ASD 2024 = **75.2%** pooled; METAFormer = **83.7%** (882-subj subset, multi-atlas, SSL) | top edge of legitimate |
-| **Our headline target** | **80–85% pooled nested 10-fold** | stretch, reachable with full stack |
-| **Our rigor number** | **~68–72% LOSO** | report alongside; the gap is a contribution |
+| **Honest full-cohort ceiling (fair CV)** | **~0.80 AUROC** — deep = linear here (arXiv 2501.17207) | not a model limit, a data/site limit |
+| **Our headline target** | **~0.79–0.81 AUROC pooled** via multi-atlas linear ensemble + phenotype fusion | realistic, defensible |
+| **Our rigor number** | **~0.66–0.70 LOSO** | report alongside; the gap is a contribution |
 
-**Hard rule for 85% to be real, not retracted:** every data-dependent transform
+> **Reframed from an earlier "80–85%" target.** The research verdict is that 80–85% on
+> the full cohort is only seen under leaky protocols; ~0.80 AUROC is the honest ceiling,
+> and our tangent-linear baseline (0.756–0.77) is already *at* it. We compete on rigor +
+> the "simple beats complex" finding + interpretability, not a higher (leaky) number.
+
+**Hard rule (integrity):** every data-dependent transform
 (tangent reference mean, ComBat, scaler, any feature selection, PCA) is `fit` on the
 **training fold only** and `transform`-applied to validation/test, *inside* the CV loop.
 Feature-selection-outside-CV is exactly what earned a 98% ABIDE paper an Expression of
@@ -86,15 +103,42 @@ explainability validated against ASD neurobiology."*
 
 ---
 
-## 2b. Novelty: contributions + required component upgrades
+## 2b. Novelty — REVISED after the evidence
 
-**Honest premise.** The individual building blocks are established — tangent-FC (Dadi
-2019), connectome transformers (BrainNetTF/METAFormer), masked SSL (METAFormer),
-multi-atlas fusion (MADE-for-ASD), ensembling. A paper claiming "new architecture" from
-these alone is rejectable. Our novelty is in **how we upgrade each block and combine
-them**, and each claim is **earned by an ablation**, never assumed.
+> **This section was reframed.** The original plan bet the novelty on beating a linear
+> baseline with a fancy transformer + adversarial/contrastive tricks (C1–C3 below). The
+> evidence killed that bet: **deep models don't beat linear on ABIDE-FC** (arXiv 2501.17207),
+> and our own transformer (0.62) and adversarial C1 (didn't hold up in validation) confirm
+> it. Forcing a "we built a better deep model" story would be dishonest and rejectable.
+> **The real, defensible contributions are:**
 
-### 2b.1 — The three core novel contributions
+### 2b.0 — The actual contributions (evidence-driven)
+
+1. **A rigorous, leakage-free, dual-protocol benchmark on full ABIDE-I.** Everything
+   (tangent reference, scaler, selection, ComBat) fit strictly in-fold; **pooled 10-fold
+   AND leave-one-site-out** reported. Most "SOTA" papers can't survive this — the
+   pooled↔LOSO gap is itself a finding.
+2. **A rigorous "simple beats complex" result.** With one clean pipeline we show a
+   **multi-atlas tangent-linear ensemble + phenotype late-fusion (~0.79–0.81)** matches or
+   beats self-supervised connectome transformers/GNNs (which we built and report as
+   negative results) — corroborating and extending Luo et al. 2025 with an interpretable,
+   reproducible model. *This is a publishable message, not a failure.*
+3. **Interpretability that deep models can't beat.** Linear tangent-FC gives directly
+   interpretable, cross-fold-**stable** discriminative edges → aggregated to brain networks
+   → validated against ASD neurobiology (E6). Plus **counterfactual connectome edges** (old
+   C3 — still valid and now applied to the linear model).
+4. **A validated GPU-accelerated tangent-space FC** (`gpu_tangent.py`, numerically identical
+   to nilearn, faster) — a reusable engineering contribution.
+5. **An honest leakage audit** (E3.8): quantify how many points leakage *would* have bought.
+
+**Old C1 (site-adversarial):** implemented + mechanism-validated, but did not improve
+generalization in testing → reported honestly as a negative / ComBat-fallback, not a
+headline. **Old C2 (contrastive SSL + learned fusion):** moot — it targets deep models that
+lose to linear; the reliable "fusion" is simple soft-voting of linear per-atlas models.
+
+---
+
+### 2b.1 — (superseded) original three "novel" contributions
 
 **C1 — Learned site-adversarial harmonization *inside* the connectome transformer.**
 - *Gap:* multi-site generalization — the reason pooled (~75%) collapses to LOSO (~65%);
