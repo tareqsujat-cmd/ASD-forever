@@ -56,16 +56,16 @@ def plot_sota_comparison(our_acc: float, out: str | Path,
         lo = min(min(accs), HEINSFELD_BASELINE) - 0.03
         hi = max(max(accs), BEST_HONEST) + 0.05
         ax.set_xlim(max(0.5, lo), hi)
-        ax.set_xlabel("Accuracy — ABIDE-I (full cohort, honest protocols)")
-        title = "ASD classification on ABIDE-I — vs. best legitimate methods"
+        ax.set_xlabel("Accuracy (ABIDE-I, full cohort)")
+        title = "ASD classification on ABIDE-I"
         if our_auroc is not None:
-            title += f"\n(ours AUROC = {our_auroc:.3f})"
+            title += f"   (ours AUROC = {our_auroc:.3f})"
         ax.set_title(title)
         legend = [
             Patch(facecolor=COLORS["asd"], edgecolor="black", label="Ours"),
-            Patch(facecolor=COLORS["model_a"], edgecolor="black", label="Prior full-cohort SOTA"),
-            plt.Line2D([], [], ls="--", color=COLORS["random"], label="Heinsfeld 0.70"),
-            plt.Line2D([], [], ls=":", color=COLORS["model_c"], label="Best honest 0.752"),
+            Patch(facecolor=COLORS["model_a"], edgecolor="black", label="Published methods"),
+            plt.Line2D([], [], ls="--", color=COLORS["random"], label="Heinsfeld 2018 (0.70)"),
+            plt.Line2D([], [], ls=":", color=COLORS["model_c"], label="MADE-for-ASD (0.752)"),
         ]
         ax.legend(handles=legend, loc="lower right", fontsize=8, framealpha=0.9)
         out = Path(out); out.mkdir(parents=True, exist_ok=True)

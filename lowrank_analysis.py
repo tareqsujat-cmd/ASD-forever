@@ -108,9 +108,9 @@ def main() -> None:
             ax.errorbar(ranks, ms, yerr=ss, fmt="-o", color=COLORS["asd"], lw=2.6, capsize=3)
             ax.axvline(rank95, ls="--", lw=1.6, color=COLORS["random"],
                        label=f"95% at rank {rank95}")
-            ax.set_xscale("log"); ax.set_xlabel("PCA rank (linear subspace dim)")
+            ax.set_xscale("log"); ax.set_xlabel("PCA subspace rank")
             ax.set_ylabel("AUROC (nested CV)")
-            ax.set_title("ASD signal is low-rank & linear")
+            ax.set_title("AUROC vs. linear subspace rank")
             ax.legend(loc="lower right")
             for ext in ("pdf", "png"):
                 fig.savefig(out / f"accuracy_vs_rank.{ext}", bbox_inches="tight")
