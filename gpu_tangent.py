@@ -39,16 +39,52 @@ import torch
 # Batched SPD matrix functions via eigendecomposition
 # ---------------------------------------------------------------------------
 
+def _eigh(M: torch.Tensor):
+    """``torch.linalg.eigh`` with a fallback for the rare matrix on which LAPACK fails to converge.
+
+    Non-failing inputs take exactly the original path, so every result that was obtainable before is
+    unchanged.  If the batched call raises, each matrix is retried alone, then in float64, and finally
+    in float64 with a diagonal jitter that grows from 1e-10 to 1e-6 of the mean diagonal, which is far
+    below the clamp of 1e-6 applied to the eigenvalues by the callers.
+    """
+    try:
+        return torch.linalg.eigh(M)
+    except torch.linalg.LinAlgError:
+        batched = M.dim() == 3
+        mats = M if batched else M.unsqueeze(0)
+        ws, Vs = [], []
+        tries = (("native", 0.0), ("float64", 0.0), ("float64", 1e-10), ("float64", 1e-8), ("float64", 1e-6))
+        for m in mats:
+            for k, (mode, jitter) in enumerate(tries):
+                try:
+                    if mode == "native":
+                        w, V = torch.linalg.eigh(m)
+                    else:
+                        m64 = m.to(torch.float64)
+                        jit = jitter * float(m64.diagonal().mean().abs())
+                        w, V = torch.linalg.eigh(m64 + jit * torch.eye(m64.shape[-1], dtype=m64.dtype,
+                                                                       device=m64.device))
+                        w, V = w.to(M.dtype), V.to(M.dtype)
+                    break
+                except torch.linalg.LinAlgError:
+                    if k == len(tries) - 1:
+                        raise
+            ws.append(w)
+            Vs.append(V)
+        w, V = torch.stack(ws), torch.stack(Vs)
+        return (w, V) if batched else (w[0], V[0])
+
+
 def _eigfun(M: torch.Tensor, f, eps: float = 1e-6) -> torch.Tensor:
     """Apply scalar function ``f`` to the (clamped) eigenvalues of symmetric M."""
-    w, V = torch.linalg.eigh(M)
+    w, V = _eigh(M)
     w = f(torch.clamp(w, min=eps))
     return (V * w.unsqueeze(-2)) @ V.transpose(-1, -2)
 
 
 def _expm_sym(M: torch.Tensor) -> torch.Tensor:
     """Matrix exponential of a symmetric matrix (eigenvalues may be negative)."""
-    w, V = torch.linalg.eigh(M)
+    w, V = _eigh(M)
     return (V * torch.exp(w).unsqueeze(-2)) @ V.transpose(-1, -2)
 
 
@@ -61,7 +97,7 @@ def geometric_mean(covs: torch.Tensor, max_iter: int = 10, tol: float = 1e-6) ->
     """
     g = covs.mean(0)
     for _ in range(max_iter):
-        w, V = torch.linalg.eigh(g)
+        w, V = _eigh(g)
         sw = torch.sqrt(torch.clamp(w, min=1e-6))
         g_sqrt = (V * sw.unsqueeze(-2)) @ V.transpose(-1, -2)
         g_isqrt = (V * (1.0 / sw).unsqueeze(-2)) @ V.transpose(-1, -2)
@@ -76,7 +112,7 @@ def geometric_mean(covs: torch.Tensor, max_iter: int = 10, tol: float = 1e-6) ->
 
 def tangent_matrices(covs: torch.Tensor, reference: torch.Tensor) -> torch.Tensor:
     """Project covariances to the tangent space at ``reference``: log(R^-½ C R^-½)."""
-    w, V = torch.linalg.eigh(reference)
+    w, V = _eigh(reference)
     isqrt = (V * (1.0 / torch.sqrt(torch.clamp(w, min=1e-6))).unsqueeze(-2)) @ V.transpose(-1, -2)
     whitened = isqrt @ covs @ isqrt
     return _eigfun(whitened, torch.log)
@@ -97,16 +133,22 @@ class GPUTangentFC:
     max_iter : int        geometric-mean iterations (10 matches nilearn closely).
     dtype : torch.dtype   float32 (fast, validated) or float64 (reference-exact).
     discard_diagonal : bool  drop the diagonal in the vectorized output (matches
-                          nilearn vectorize; the transformer's matrix-reconstruction
-                          also expects the off-diagonal upper triangle).
+                          nilearn vectorize).
+    ridge : float         extra isotropic shrinkage applied after Ledoit-Wolf, as
+                          ``(1-r) C + r (tr C / P) I``.  Zero reproduces the standard
+                          pipeline.  The windowed path in ``dynamic_fc`` applies such a
+                          ridge unconditionally, so a static baseline left at zero is
+                          regularised less than the representation it is compared with.
     """
 
     def __init__(self, device: str = "cuda", max_iter: int = 10,
-                 dtype: torch.dtype = torch.float32, discard_diagonal: bool = True) -> None:
+                 dtype: torch.dtype = torch.float32, discard_diagonal: bool = True,
+                 ridge: float = 0.0) -> None:
         self.device = torch.device(device if _eigh_ok(device) else "cpu")
         self.max_iter = max_iter
         self.dtype = dtype
         self.discard_diagonal = discard_diagonal
+        self.ridge = float(ridge)
         self.reference_: Optional[torch.Tensor] = None
         self._n_rois: Optional[int] = None
 
@@ -116,6 +158,15 @@ class GPUTangentFC:
         from sklearn.covariance import LedoitWolf
         covs = np.stack([LedoitWolf().fit(np.asarray(ts, dtype=np.float64)).covariance_
                          for ts in timeseries])
+        if self.ridge > 0.0:
+            # Additional isotropic shrinkage towards the scaled identity, matching the
+            # ridge the windowed path applies in dynamic_fc.  Without it the static and
+            # windowed representations are regularised differently, so a comparison
+            # between them confounds the representation with the amount of shrinkage.
+            P = covs.shape[-1]
+            mu = np.trace(covs, axis1=-2, axis2=-1) / P
+            eye = np.eye(P)[None, :, :]
+            covs = (1.0 - self.ridge) * covs + self.ridge * mu[:, None, None] * eye
         self._n_rois = covs.shape[-1]
         return covs
 

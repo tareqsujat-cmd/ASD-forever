@@ -1,0 +1,84 @@
+\section{Introduction}
+\label{sec:introduction}
+
+% Part 1: the core problem
+Autism spectrum disorder (ASD) is \reviewhl{recognised} as a neurodevelopmental condition in which social communication and \reviewhl{behavioural} patterns are affected \citep{Maenneretal2023}. ASD diagnosis is dependent on behavioural
+assessment by trained clinicians, supported by the Autism Diagnostic Observation Schedule (ADOS-2)
+\citep{Lordetal2000} and the Autism Diagnostic Interview--Revised \citep{Lordetal1994}.
+Each assessment is conducted in person by trained clinicians through behavioural observation and clinical judgement, making the diagnostic process both time- and resource-intensive. Timely access to assessment is therefore important, as \reviewhl{earlier ASD identification enables appropriate interventions and support during critical stages of development}, in line with current clinical recommendations \citep{Zwaigenbaumetal2015}. \reviewhl{Brain-based measurements are consequently investigated as research tools that could complement, but do not replace, clinical assessment.}
+
+
+Resting-state functional magnetic resonance imaging (rs-fMRI) is used to measure spontaneous brain activity at rest. During the scan, spontaneous changes in blood-oxygen-level-dependent signals are recorded from different brain regions. These signals are then used to estimate functional connectivity, which is defined as the statistical relationship between the activity of different brain regions. In autistic individuals, differences in functional connectivity are observed across several brain regions and networks in large multisite studies. Functional connectivity \reviewhl{therefore serves} as an input for group comparisons and ASD classification. For the development and evaluation of such classifiers, the Autism Brain Imaging Data Exchange I (ABIDE-I) is commonly used as a shared dataset. In ABIDE-I, rs-fMRI and phenotypic data from 1,112 participants across multiple sites are made openly available \citep{DiMartinoetal2014}. The dataset is based on a research population, in which participants are recruited for research studies and most individuals in the non-autistic group are typically developing controls.
+
+
+% Part 2: the problem identified
+The problem addressed in this study is that reported findings from ABIDE-I, including classification performance and group differences, \reviewhl{are potentially influenced} by sample composition and analysis choices that are not consistently controlled across studies. In systematic reviews of studies using ABIDE-I data, differences are reported in sample selection, preprocessing, validation methods, and classifier design, making direct comparison across studies difficult \citep{Santanaetal2022,Hudaetal2024}. Four such factors are examined in this study, with the first two related to characteristics of the study sample. One of these characteristics is cognitive ability. In published ABIDE-I benchmarks, classification performance is generally reported for the overall cohort, while differences in performance across levels of cognitive ability are rarely examined \citep{Heinsfeldetal2018,Eslamietal2019,AlmuqhimSaeed2021}. Full-scale intelligence quotient (IQ) varies across autistic participants and is generally lower than that of non-autistic participants in the dataset (Table~\ref{tab:participants}). Classification performance \reviewhl{is therefore potentially influenced} by the cognitive characteristics of the participants included in the analysis. This possibility is further supported by reports that classifier scores vary with verbal IQ in ABIDE data \citep{Nielsenetal2013}. This finding alone is not sufficient to establish whether the relationship is specifically associated with autism. A second sample-related factor is head motion, which is known to affect functional-connectivity measurements \citep{Poweretal2012}. In this study, head motion is measured using mean framewise displacement, which represents the average movement of the head between consecutive image volumes. Greater head motion is observed among autistic participants in the dataset (Table~\ref{tab:participants}), indicating that some reported differences in functional connectivity \reviewhl{are also potentially influenced} by motion. This issue is relevant to reported reductions in connectivity within the somatomotor system, which includes regions involved in movement and bodily sensation \citep{Holigaetal2019,Ilioskaetal2023}. Since only the linear effect of motion is removed through motion regression, it is not fully established whether this connectivity difference remains when autistic and non-autistic participants are explicitly matched for head motion.
+
+
+The remaining two factors are related to choices made during the analysis. The first factor is the scope of feature selection, through which the features most relevant to ASD classification are identified. During cross-validation, one fold is held out for testing, while the remaining folds are used for model training. If features are selected using diagnostic labels from the full dataset before cross-validation, information from the test data is included in the training process. This results in data leakage and \reviewhl{risks overestimating} classification performance. The second factor is the choice of classifier. More complex nonlinear models have increasingly been proposed for ASD classification \citep{Liuetal2024MADE,Tangetal2025GNNLSTM,Tangetal2026CASGNN}. Strong performance with tangent-space connectivity and regularised linear classifiers has also been reported in an earlier benchmark \citep{Dadietal2019}. In tangent-space connectivity, each participant's covariance matrix, which describes how signals from pairs of brain regions vary together, is represented relative to a reference matrix. The independent effects of feature-selection scope and classifier choice are difficult to determine from comparisons across existing studies because other parts of the analysis pipeline also differ. Therefore, their effects need to be evaluated using the same participants, features, and cross-validation folds.
+
+
+% Part 3: existing solutions
+Existing approaches to ASD classification using ABIDE-I are mainly focused on improving functional-connectivity features, classification models, and the handling of differences between acquisition sites. Different representations of functional connectivity, including the tangent-space projection of covariance matrices \citep{Varoquauxetal2010}, are compared in a controlled benchmark \citep{Dadietal2019}. Accuracies close to 0.70 are reported for deep autoencoder models on ABIDE-I \citep{Heinsfeldetal2018,Eslamietal2019,AlmuqhimSaeed2021}. Graph-based and convolutional models are also used to represent relationships between participants \citep{Parisotetal2018} and connections within brain networks \citep{Kawaharaetal2017}. These modelling approaches are further extended through multi-atlas deep ensembles \citep{Liuetal2024MADE}, dynamic graph models \citep{Tangetal2025GNNLSTM}, and multimodal graph models \citep{Tangetal2026CASGNN}. Differences between acquisition sites are addressed through harmonisation methods \citep{Johnsonetal2007,Fortinetal2018} and validation on held-out sites \citep{Abrahametal2017}. Performance in most of these studies is reported for the whole cohort, so variation in classification performance across participant groups is not clearly established. It also remains unclear whether reported differences in functional connectivity are preserved when head motion is directly controlled. In addition, the effects of feature-selection scope and classifier family are rarely examined under the same cross-validation setting, apart from the controlled benchmark reported by \citet{Dadietal2019}. These limitations support the need for a controlled evaluation in which participant characteristics and analysis choices are examined within the same framework. A detailed review of these existing approaches and their limitations is provided in Section~\ref{sec:related}.
+
+
+% Part 4: what is proposed
+To address this gap, a leakage-controlled evaluation is proposed, built on one fixed
+prediction pipeline (Figure~\ref{fig:overview}). In this pipeline, three connectivity
+descriptions are computed for each participant: correlation, static tangent-space, and
+windowed tangent-space connectivity. The windowed description is computed from shorter
+segments, or windows, of each scan. Each description is then classified by
+$\ell_2$-regularised logistic regression, a linear model whose weights are shrunk towards
+zero, and the three probabilities are averaged. Every learned quantity, including the
+tangent reference, the feature scaler, and the penalty strength, is fitted within the
+training partition. Performance is estimated under two schemes. In pooled ten-fold
+validation, participants from all sites are divided into ten folds; in leave-one-site-out
+validation, each of the 20 recorded site labels is held out once. Discrimination is
+summarised by the area under the receiver operating characteristic curve (AUROC). This is
+the probability that a randomly chosen autistic participant is scored above a randomly
+chosen non-autistic participant. Participant-pooled values are computed once from all
+held-out predictions, whereas fold-mean values are averaged across folds. Alongside this
+pipeline, six targeted analyses are run: cognitive-ability stratification against a
+fixed comparison group, group contrasts before and after within-site matching for head
+motion, feature-selection scope, classifier family, the scope of the symptom-severity
+associations, and a shrinkage control for the windowed description. The group
+contrasts are univariate and do not use the classifier. They are exploratory, like the
+cognitive-ability analysis, and are computed without global signal regression, which would
+remove the whole-brain mean signal (Sections~\ref{subsubsec:data-preprocessing}
+and~\ref{subsec:group-differences}). The selection-scope comparison, the symptom-association
+comparison, and the shrinkage control are, in contrast, primary descriptive comparisons,
+whereas the classifier comparison is a secondary one. These designations set the evidential
+weight of each result (Section~\ref{subsubsec:analysis-status}).
+
+% Part 5: contributions
+The main contributions of this study are as follows.
+\begin{itemize}
+\item \textbf{\reviewhl{Connectivity-based discrimination varies with cognitive ability in this cohort.}} Detection is
+\reviewhl{lower in the highest-IQ autistic subgroup than in the lowest-IQ subgroup}. Against a fixed comparison
+group, AUROC falls from 0.873 below full-scale IQ 85 to 0.719 at 115 or above. Sample
+composition therefore matters.
+\item \textbf{\reviewhl{The somatomotor connectivity difference persists after matching on recorded mean head motion.}}
+Reduced somatomotor connectivity strengthens, rather than disappears, when participants are
+matched for head motion within site. The mean regional effect strengthens from $-0.215$ to
+$-0.249$, supporting earlier reports under motion control.
+\item \textbf{Connection-level feature selection before the split inflates reported
+performance.} Selecting 2,000 of 19,900 connections with all labels raises AUROC from 0.756
+to 0.987, whereas selecting whole regions has little effect. Without this step, accuracy
+reaches 0.706, matching published benchmarks (0.700--0.708).
+\item \textbf{\reviewhl{The evaluated linear configurations outperform the evaluated fixed tree configurations.}} On identical
+features and folds, linear classifiers reach AUROCs of 0.735--0.757, against 0.611--0.624 for
+fixed-configuration tree ensembles. Only the logistic model is tuned, so \reviewhl{the comparison does not establish superiority of a classifier family}.
+\item \textbf{Classifier scores are shown to reflect group membership rather than the degree
+of autism.} Symptom-severity associations are obtained across both groups, whereas none
+survives correction within the autistic group. For the Social Responsiveness Scale total, the
+correlation falls from 0.438 to 0.050.
+\item \textbf{The advantage of windowed connectivity is explained by covariance shrinkage.}
+An additional shrinkage is applied by the windowed description alone. Once the whole-scan
+description receives it, that description gains 0.013 AUROC. The windowed advantage then
+disappears, leaving a difference of $-0.002$.
+\end{itemize}
+The remainder of the paper is organised as follows: related work is reviewed in
+Section~\ref{sec:related}, the methods are described in
+Section~\ref{sec:methods}, and the results are reported in Section~\ref{sec:results}.
+The findings are then discussed in Section~\ref{sec:discussion}, and conclusions are drawn in
+Section~\ref{sec:conclusion}.

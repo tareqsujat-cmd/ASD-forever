@@ -218,6 +218,7 @@ def run_protocol(
     inner_folds: int = 3,
     C_grid: Optional[List[float]] = None,
     tangent_device: Optional[str] = None,
+    sids: Optional[List[str]] = None,
 ) -> Dict:
     """Nested CV for one (metric, protocol). Returns metrics + OOF predictions.
 
@@ -241,7 +242,7 @@ def run_protocol(
         gpu_tan = GPUTangentFC(device=tangent_device or "cpu", max_iter=10)
         covs = gpu_tan.compute_covariances(ts_list)     # once, fold-independent
 
-    oof_true, oof_prob, oof_site = [], [], []
+    oof_true, oof_prob, oof_site, oof_sid = [], [], [], []
     fold_metrics: List[Dict[str, float]] = []
     t0 = time.time()
 
@@ -268,6 +269,9 @@ def run_protocol(
         oof_true.extend(y[te].tolist())
         oof_prob.extend(prob.tolist())
         oof_site.extend(sites[te].tolist())
+        # participant identifiers travel with the predictions, so any later subgroup or
+        # sensitivity analysis links to phenotype without reconstructing the fold order
+        oof_sid.extend([str(sids[i]) for i in te] if sids is not None else [""] * len(te))
         fm = _metrics(y[te], prob)
         fm["best_C"] = float(gs.best_params_["clf__C"])
         fold_metrics.append(fm)
@@ -289,116 +293,7 @@ def run_protocol(
         "pooled_oof": pooled_oof, "ci": ci,
         "elapsed_s": round(time.time() - t0, 1),
         "oof_true": oof_true.tolist(), "oof_prob": oof_prob.tolist(),
-        "oof_site": oof_site,
-    }
-
-
-def run_protocol_torch(
-    ts_list: List[np.ndarray],
-    y: np.ndarray,
-    sites: np.ndarray,
-    kind: str,
-    protocol: str,
-    n_folds: int,
-    seed: int,
-    device: str = "cpu",
-    epochs: int = 60,
-    lr: float = 3e-4,
-    weight_decay: float = 1e-4,
-    batch_size: int = 32,
-    d_model: int = 128,
-    patience: int = 12,
-) -> Dict:
-    """
-    Nested CV for the Connectome Transformer on in-fold tangent/correlation FC.
-
-    Per outer fold: fit the connectivity reference on TRAIN only, standardize on
-    TRAIN, carve an inner validation split for early stopping, train the
-    transformer, and score the held-out fold.  Leakage-free by construction.
-    """
-    import torch
-    from sklearn.model_selection import StratifiedKFold
-    from sklearn.preprocessing import StandardScaler
-    from models.connectome_transformer import ConnectomeTransformer
-
-    dev = torch.device(device)
-    splits, _ = _outer_splits(protocol, y, sites, n_folds, seed)
-    oof_true, oof_prob, oof_site = [], [], []
-    fold_metrics: List[Dict[str, float]] = []
-    t0 = time.time()
-    n_rois = ts_list[0].shape[1]
-
-    def _train_one(Xtr, ytr, Xva, yva):
-        torch.manual_seed(seed)
-        model = ConnectomeTransformer(n_rois=n_rois, d_model=d_model,
-                                      n_heads=4, n_layers=2, dropout=0.3).to(dev)
-        opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
-        crit = torch.nn.CrossEntropyLoss()
-        Xtr_t = torch.tensor(Xtr, dtype=torch.float32)
-        ytr_t = torch.tensor(ytr, dtype=torch.long)
-        Xva_t = torch.tensor(Xva, dtype=torch.float32, device=dev)
-        from sklearn.metrics import roc_auc_score
-        best_auc, best_state, bad = -1.0, None, 0
-        n = len(Xtr_t)
-        for ep in range(epochs):
-            model.train()
-            perm = torch.randperm(n)
-            for i in range(0, n, batch_size):
-                bi = perm[i:i + batch_size]
-                xb = Xtr_t[bi].to(dev); yb = ytr_t[bi].to(dev)
-                opt.zero_grad()
-                loss = crit(model(xb), yb)
-                loss.backward(); opt.step()
-            model.eval()
-            with torch.no_grad():
-                pv = torch.softmax(model(Xva_t), dim=-1)[:, 1].cpu().numpy()
-            auc = roc_auc_score(yva, pv) if len(set(yva)) > 1 else 0.5
-            if auc > best_auc:
-                best_auc, best_state, bad = auc, {k: v.detach().cpu().clone()
-                                                  for k, v in model.state_dict().items()}, 0
-            else:
-                bad += 1
-                if bad >= patience:
-                    break
-        if best_state is not None:
-            model.load_state_dict(best_state)
-        return model
-
-    for k, (tr, te) in enumerate(splits):
-        cm = _connectivity(kind)
-        Xtr_full = cm.fit_transform([ts_list[i] for i in tr])
-        Xte = cm.transform([ts_list[i] for i in te])
-        scaler = StandardScaler().fit(Xtr_full)
-        Xtr_full = scaler.transform(Xtr_full); Xte = scaler.transform(Xte)
-
-        # inner split for early stopping
-        inner = StratifiedKFold(n_splits=5, shuffle=True, random_state=seed)
-        itr, iva = next(inner.split(Xtr_full, y[tr]))
-        model = _train_one(Xtr_full[itr], y[tr][itr], Xtr_full[iva], y[tr][iva])
-
-        model.eval()
-        with torch.no_grad():
-            prob = torch.softmax(
-                model(torch.tensor(Xte, dtype=torch.float32, device=dev)), dim=-1
-            )[:, 1].cpu().numpy()
-        oof_true.extend(y[te].tolist()); oof_prob.extend(prob.tolist())
-        oof_site.extend(sites[te].tolist())
-        fm = _metrics(y[te], prob)
-        fold_metrics.append(fm)
-        logger.info("  [transformer/%s/%s] fold %2d/%d  AUROC=%.3f acc=%.3f",
-                    kind, protocol, k + 1, len(splits), fm["auroc"], fm["accuracy"])
-
-    oof_true = np.array(oof_true); oof_prob = np.array(oof_prob, dtype=np.float64)
-    keys = list(fold_metrics[0].keys())
-    mean = {k: float(np.nanmean([f[k] for f in fold_metrics])) for k in keys}
-    std = {k: float(np.nanstd([f[k] for f in fold_metrics])) for k in keys}
-    return {
-        "metric": f"transformer+{kind}", "protocol": protocol, "n_folds": len(splits),
-        "fold_mean": mean, "fold_std": std,
-        "pooled_oof": _metrics(oof_true, oof_prob),
-        "ci": _bootstrap_ci(oof_true, oof_prob, seed=seed),
-        "elapsed_s": round(time.time() - t0, 1),
-        "oof_true": oof_true.tolist(), "oof_prob": oof_prob.tolist(), "oof_site": oof_site,
+        "oof_site": oof_site, "oof_sid": oof_sid,
     }
 
 
@@ -431,9 +326,9 @@ def main() -> None:
     p.add_argument("--metrics", nargs="+", default=["correlation", "tangent"],
                    choices=["correlation", "tangent", "partial correlation"])
     p.add_argument("--protocol", default="both", choices=["pooled", "loso", "both"])
-    p.add_argument("--model", default="logreg", choices=["logreg", "transformer"],
-                   help="logreg = linear baseline; transformer = connectome transformer")
-    p.add_argument("--device", default="cpu", help="cpu | cuda | mps (transformer only)")
+    p.add_argument("--model", default="logreg", choices=["logreg"],
+                   help="linear tangent-FC baseline")
+    p.add_argument("--device", default="cpu", help="cpu | cuda | mps (tangent projection)")
     p.add_argument("--epochs", type=int, default=60, help="transformer epochs/fold")
     p.add_argument("--n_folds", type=int, default=10)
     p.add_argument("--n_perm", type=int, default=0, help="permutation shuffles (0=skip)")
@@ -460,14 +355,10 @@ def main() -> None:
     for kind in args.metrics:
         for proto in protocols:
             logger.info("=== %s | %s | %s ===", args.model, kind, proto)
-            if args.model == "transformer":
-                res = run_protocol_torch(ts_list, y, sites, kind, proto, args.n_folds,
-                                         args.seed, device=args.device, epochs=args.epochs)
-            else:
-                res = run_protocol(ts_list, y, sites, kind, proto, args.n_folds, args.seed,
-                                   tangent_device=args.device)
-                res["permutation_p"] = permutation_pvalue(
-                    ts_list, y, sites, kind, proto, args.n_folds, args.seed, args.n_perm)
+            res = run_protocol(ts_list, y, sites, kind, proto, args.n_folds, args.seed,
+                               tangent_device=args.device, sids=sids)
+            res["permutation_p"] = permutation_pvalue(
+                ts_list, y, sites, kind, proto, args.n_folds, args.seed, args.n_perm)
             res.setdefault("permutation_p", None)
             results.append(res)
 

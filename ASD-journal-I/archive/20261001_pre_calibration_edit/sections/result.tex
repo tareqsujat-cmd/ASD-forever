@@ -1,0 +1,764 @@
+\section{Results}
+\label{sec:results}
+
+The results are reported in the order of the analyses described in
+Section~\ref{sec:methods}. First, the discrimination of the primary ensemble and its
+transfer to unseen sites are presented, together with a placement against published
+ABIDE-I work. Then, the six contributions are reported in turn. In order, these concern
+cognitive ability, functional-system differences under motion matching, feature-selection
+scope, classifier family, the scope of the symptom-severity associations, and the covariance
+shrinkage applied by the windowed description. Finally, the secondary results are summarised,
+and their null findings are stated as limits. Throughout, AUROC and accuracy are labelled as
+participant-pooled or as fold means (Section~\ref{subsubsec:performance-measures}), because the two summaries
+\reviewhl{differ}.
+
+\subsection{Classification performance and transfer to unseen sites}
+\label{subsec:results-performance}
+
+The highest AUROC of the connectivity-only configurations is obtained with the primary
+ensemble under both validation protocols (Table~\ref{tab:configurations}). Specifically, a
+fold-mean AUROC of 0.775 is obtained under pooled ten-fold validation, and a fold-mean
+AUROC of 0.773 is obtained under leave-one-site-out validation. However, the gain over the
+best single representation, the windowed tangent mean, is small ($+0.009$ in
+participant-pooled AUROC).
+Moreover, this gain is not distinguished from chance (unadjusted DeLong $p=0.066$), so it
+is not presented as an established improvement. The rank-mean ensemble
+(Section~\ref{subsubsec:rank-fusion}) is, in turn, reported for comparison only. Because its score is
+not a probability, it has no 0.5 decision threshold, and no accuracy is reported for it.
+
+\begin{table}[pos=htb]
+\centering
+\caption{Discrimination of the ensemble and of its members in the primary cohort
+(871 participants). AUROC and accuracy are fold means, and SD is the standard deviation
+across outer folds. The rank-mean ensemble has no probability scale, so no accuracy is
+given for it.}
+\label{tab:configurations}
+\small
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+ & \multicolumn{3}{c}{Pooled ten-fold} & \multicolumn{3}{c}{Leave-one-site-out} \\
+\cmidrule(lr){2-4}\cmidrule(l){5-7}
+Configuration & AUROC & SD & Accuracy & AUROC & SD & Accuracy \\
+\midrule
+Ensemble, probability mean (adopted) & 0.775 & 0.040 & 0.707 & 0.773 & 0.087 & 0.684 \\
+Windowed tangent, mean & 0.767 & 0.044 & 0.695 & 0.771 & 0.082 & 0.670 \\
+Ensemble, rank mean & 0.756 & 0.038 & -- & 0.750 & 0.091 & -- \\
+Static tangent & 0.756 & 0.048 & 0.692 & 0.757 & 0.104 & 0.643 \\
+Correlation & 0.750 & 0.040 & 0.683 & 0.743 & 0.083 & 0.655 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+As shown by participant-pooled estimates with intervals, discrimination is maintained when
+a whole site is withheld from training (Table~\ref{tab:performance};
+Figure~\ref{fig:performance}a). Specifically, an AUROC of 0.776 (95\% DeLong interval
+0.745--0.807) is obtained under pooled ten-fold validation. Similarly, an AUROC of 0.774
+(0.744--0.805) is obtained under leave-one-site-out validation. In addition, sensitivity
+and specificity are nearly equal under pooled ten-fold validation (0.705 and 0.709), so the
+ensemble does not favour one class under this protocol. With the site withheld, in
+contrast, sensitivity is higher than specificity (0.742 against 0.684). As a result, more of
+the errors under this protocol fall on non-autistic participants. These intervals, however,
+condition on the fitted model and treat
+dependent out-of-fold predictions as independent (Section~\ref{subsubsec:interval-construction}). For this
+reason, they are the narrowest defensible intervals rather than a full account of
+uncertainty.
+
+Intervals that carry the site clustering are wider, and they are reported alongside the
+parametric ones (Section~\ref{subsubsec:paired-comparisons}). Under the site-clustered
+bootstrap, the participant-pooled AUROC of 0.776 carries a 95\% interval of 0.733 to 0.807,
+against 0.745 to 0.807 from the DeLong interval. Similarly, accuracy carries an interval of
+0.670 to 0.737, against 0.676 to 0.736 from the Wilson interval. With a site withheld, the
+AUROC interval widens from 0.744--0.805 to 0.726--0.808, and the accuracy interval from
+0.680--0.740 to 0.661--0.748. The lower bound moves further than the upper bound in every
+case, so the parametric intervals are anti-conservative mainly at the lower end. None of the
+intervals includes 0.5, so the discrimination itself is not placed in question by the wider
+estimates.
+
+The analysed cohorts are reconciled against the released records. Of the 1,112 ABIDE-I
+phenotypic records, 1,035 have a preprocessed derivative, and 871 satisfy the three-rater
+primary rule and have usable regional time series, comprising 403 autistic and 468
+non-autistic participants.
+
+\begin{table}[t]
+\centering
+\caption{Participant-pooled performance of the primary ensemble in the primary cohort
+(871 participants), with 95\% intervals. AUROC carries DeLong intervals; accuracy,
+sensitivity and specificity carry Wilson intervals.}
+\label{tab:performance}
+\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Validation & AUROC & Accuracy & Sensitivity & Specificity \\
+\midrule
+Pooled ten-fold & 0.776 (0.745--0.807) & 0.707 (0.676--0.736) & 0.705 (0.658--0.747) & 0.709 (0.667--0.749) \\
+Leave-one-site-out & 0.774 (0.744--0.805) & 0.711 (0.680--0.740) & 0.742 (0.697--0.782) & 0.684 (0.640--0.724) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[pos=tbp]
+\centering
+\includegraphics[width=\linewidth]{fig_performance}
+\caption{Discrimination, per-site transfer, calibration and abstention of the primary
+ensemble. (a) Discrimination with 95\% intervals under both validation protocols. (b) AUROC
+at every site when that site is withheld from training, with marker area proportional to
+the number of participants; the random-effects mean and the prediction interval for a site
+not yet seen are shown. (c) Predicted probability against observed frequency. (d) For the
+cohort-wide and per-site abstention rules under leave-one-site-out validation, the
+percentage of participants answered when the threshold is set on the whole sample and the
+percentage of held-out half-splits in which the error target is met, against the nominal
+90\%.}
+\label{fig:performance}
+\end{figure}
+
+Variation between sites is summarised by a random-effects model \reviewhl{as a descriptive sensitivity analysis}. When the 20 per-site
+estimates are combined, therefore, a random-effects mean AUROC of 0.803 is obtained
+(Figure~\ref{fig:performance}b). In addition, between-site heterogeneity is not
+distinguishable from chance ($Q=23.5$ on 19 degrees of freedom, $p=0.22$; $I^2=19\%$). As a
+result, the \reviewhl{descriptive 95\% interval} of Equation~\eqref{eq:prediction-interval}
+extends from 0.725 to 0.882. However, leave-one-site-out estimates share training data, so
+the heterogeneity is, if anything, understated. \reviewhl{This interval is not interpreted as a validated prediction interval for an independent site.}
+
+Site-level AUROC nevertheless varies widely, from 0.589 at SBL to 0.912 at UM\_2. In
+particular, no site's point estimate falls to chance, but 2 of 20 sites lie below 0.65
+(SBL and MAX\_MUN). Moreover, the 95\% intervals of 5 sites (CALTECH, LEUVEN\_1, MAX\_MUN,
+OHSU and SBL) include 0.5. This spread, however, is not taken as evidence of site-dependent
+failure, because the median site contributes about thirty participants. For this reason,
+wide per-site intervals are expected even under identical performance at every site.
+
+Phenotypic variables carry some diagnostic information, but they add little to the
+connectivity features. Specifically, an AUROC of about 0.62 is reached by the phenotype
+model (Section~\ref{par:phenotype-model}) on its own. In addition, participant-pooled AUROC is raised
+by about 0.004 when this model is added to the ensemble (unadjusted $p=0.041$; $q=0.11$,
+for reference only). Because this gain is small, the phenotypic member is not adopted.
+
+The placement against published ABIDE-I work is given in Table~\ref{tab:published-comparison}, in
+which sample size and testing procedure are listed because both change what a value means.
+For this comparison, the wider quality-control cohort is used,
+because its quality-control definition admits 1,035 participants, the same eligible count
+as in the published studies. However, three of these participants have no usable time
+series in the release, so 1,032 are analysed. In this cohort, a participant-pooled accuracy
+of 0.706 (95\% Wilson interval 0.678--0.733) is obtained under pooled ten-fold validation. In comparison, accuracies of 0.700, 0.703 and 0.708 are
+reported by \citet{Heinsfeldetal2018}, \citet{Eslamietal2019} and
+\citet{AlmuqhimSaeed2021}, and these values are not recomputed here.
+
+\begin{table}[t]
+\centering
+\caption{Placement against published work on ABIDE-I resting-state functional
+connectivity. Values for the other studies are as reported by their authors; n.r., not
+reported. For the ensemble rows, AUROC is participant-pooled and accuracy is the fold mean,
+which agrees with the participant-pooled value to three decimals. For the tangent-model
+row, AUROC and accuracy are fold means. The unseen-site column gives the
+leave-one-site-out AUROC, with its difference from the pooled ten-fold value in brackets.}
+\label{tab:published-comparison}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.24\linewidth}cccccc@{}}
+\toprule
+Study & Accuracy & AUROC & Sample & Procedure & AUROC, unseen site & Calibration error \\
+\midrule
+\citet{Heinsfeldetal2018} & 0.700 & n.r. & 1,035 & 10-fold & n.r. & n.r. \\
+\citet{Eslamietal2019} & 0.703 & n.r. & 1,035 & 10-fold & n.r. & n.r. \\
+\citet{AlmuqhimSaeed2021} & 0.708 & n.r. & 1,035 & 10-fold & n.r. & n.r. \\
+This work, ensemble & 0.707 & 0.776 & 871 & nested 10-fold & 0.774 ($-0.002$) & 0.046 \\
+This work, ensemble, \reviewhl{wider QC cohort} & 0.706 & 0.789 & 1,032 & nested 10-fold & 0.783 ($-0.006$) & 0.023 \\
+This work, tangent model, \reviewhl{wider QC cohort} & 0.696 & 0.766 & 1,032 & nested 10-fold & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The accuracy comparison in Table~\ref{tab:published-comparison} does not separate the methods,
+because none of the comparison studies reports a confidence interval. In addition, the
+intervals implied by these sample sizes are roughly $\pm0.03$, whereas the three published
+values span 0.008. For this reason, two further quantities that those studies do not
+report are listed, and they describe the present work without being compared with the
+published values. Specifically, the AUROC on an unseen site is 0.774 against 0.776 within
+the cohort, and the expected calibration error is 0.046 (Section~\ref{subsec:results-secondary}). In
+addition, accuracy at the published level is reached under a procedure in which no step is
+fitted before the data are split. This property matters because a step fitted before the
+split \reviewhl{inflates} the estimate (Section~\ref{subsec:results-selection-scope}).
+
+The cohort definition itself changes the score, so both definitions are reported for a
+like-for-like comparison. Specifically, a fold-mean AUROC of 0.756 is reached by the static
+tangent model in the primary cohort of 871 participants, and 0.766 in the wider cohort of
+1,032 participants. However, the scans excluded by the primary definition are mostly those with
+head motion or failed processing, and they are not evenly split between the groups. Part of
+this gain \reviewhl{could}, therefore, reflect data quality rather than differences in brain
+connectivity.
+
+\subsection{Cognitive ability and detection}
+\label{subsec:results-cognitive-ability}
+
+\reviewhl{Discrimination is lower in higher-IQ autistic subgroups in the unmatched band analysis}, and
+this pattern underlies the first contribution of the study. Because the subgroup analyses
+are exploratory (Sections~\ref{par:cognitive-sex-subgroups} and~\ref{subsubsec:analysis-status}), the pattern is reported as
+a description rather than as a confirmed effect. To separate it from changes in the
+comparison group, the comparison group is held fixed at all 468 non-autistic participants.
+Only the autistic participants, in turn, are divided into full-scale IQ bands. As a result, every band is
+scored against the same reference, so differences between bands cannot arise from changes
+in the comparison group. Under this design, AUROC falls monotonically from 0.873 below
+full-scale IQ 85 to 0.719 at 115 or above under pooled ten-fold validation
+(Table~\ref{tab:iq-bands}; Figure~\ref{fig:group-differences}d). Similarly, AUROC falls from
+0.871 to 0.709 when the site is withheld. However, the autistic bands still differ from the
+reference group in full-scale IQ, and this separation is addressed next.
+
+\begin{table}[t]
+\centering
+\caption{AUROC by full-scale IQ (FIQ) band of the autistic participants, each band scored
+against the same comparison group of all 468 non-autistic participants.}
+\label{tab:iq-bands}
+\small
+\begin{tabular}{@{}lccc@{}}
+\toprule
+Autistic participants & $n$ & Pooled ten-fold & Leave-one-site-out \\
+\midrule
+FIQ below 85 & 40 & 0.873 & 0.871 \\
+FIQ 85--99 & 97 & 0.815 & 0.816 \\
+FIQ 100--114 & 126 & 0.781 & 0.788 \\
+FIQ 115 or above & 113 & 0.719 & 0.709 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[pos=tbp]
+\centering
+\includegraphics[width=\linewidth]{fig_groupdiff}
+\caption{Group differences in functional-system connectivity and the effect of motion
+matching. (a, b) Standardised difference for every pair of systems in all participants and
+in within-site pairs matched for head motion, on a shared colour scale; asterisks mark
+pairs with Benjamini--Hochberg $q<0.05$. (c) The effect of each somatomotor region in all
+participants plotted against its effect in motion-matched pairs; points below the diagonal
+are stronger once motion is matched. (d) Discrimination by full-scale IQ band among
+autistic participants (below 85, 85--99, 100--114, and 115 or above), each against all 468
+non-autistic participants, under both validation protocols.}
+\label{fig:group-differences}
+\end{figure}
+
+The gradient is reproduced when both groups are stratified by IQ, but this design is also
+affected by the group difference in IQ. Specifically, all participants are divided into
+quartiles of
+site-centred full-scale IQ (Table~\ref{tab:iq-quartiles}). Under pooled ten-fold validation,
+AUROC then falls from 0.833 in the lowest quartile to 0.709 in the highest. However,
+autistic participants have lower full-scale IQ (Table~\ref{tab:participants}), so the lower
+quartiles are also those in which the groups differ most on IQ. For this reason, each
+autistic participant is matched to a non-autistic participant at the same site whose
+full-scale IQ differs by at most five points. As a result, 274 pairs are obtained under
+pooled ten-fold validation and 275 pairs with the site withheld.
+
+\begin{table}[t]
+\centering
+\caption{AUROC by quartile of site-centred full-scale IQ, in all participants and in
+participants matched on full-scale IQ within site. The matched counts are given for pooled
+ten-fold and leave-one-site-out (LOSO) validation, respectively.}
+\label{tab:iq-quartiles}
+\small
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+ & \multicolumn{3}{c}{All participants} & \multicolumn{3}{c}{IQ-matched participants} \\
+\cmidrule(lr){2-4}\cmidrule(l){5-7}
+Quartile & $n$ & Pooled ten-fold & LOSO & $n$ (pooled / LOSO) & Pooled ten-fold & LOSO \\
+\midrule
+Q1 & 204 & 0.833 & 0.825 & 137 / 144 & 0.855 & 0.848 \\
+Q2 & 203 & 0.794 & 0.793 & 137 / 132 & 0.700 & 0.735 \\
+Q3 & 201 & 0.746 & 0.745 & 138 / 137 & 0.751 & 0.737 \\
+Q4 & 203 & 0.709 & 0.705 & 136 / 137 & 0.756 & 0.756 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+After IQ matching, discrimination remains highest in the lowest quartile but no longer
+declines across the upper three. Specifically, AUROC in the lowest quartile is 0.855 under
+pooled ten-fold validation and 0.848 with the site withheld. In contrast, AUROC across the
+upper three quartiles ranges from 0.700 to 0.756 under pooled ten-fold validation and from
+0.735 to 0.756 with the site withheld. Therefore, part of the gradient over the full IQ
+range reflects the group difference in IQ. The within-group association, which involves no
+comparison between groups, \reviewhl{is examined next as complementary evidence}.
+
+Within the autistic group, classifier scores decline with cognitive ability, whereas no
+such association is found in non-autistic participants (Table~\ref{tab:iq-correlations}). For this
+analysis, site, age and mean framewise displacement are regressed from both the score and
+the IQ measure (Section~\ref{subsubsec:correlation-analyses}). Under this adjustment, the score correlates with
+full-scale IQ at $\rho=-0.180$ ($p=0.0004$, $n=376$) among autistic participants under
+pooled ten-fold validation. In contrast, the corresponding value among non-autistic
+participants is $+0.048$ ($p=0.3208$, $n=435$). In addition, the same pattern is obtained
+for verbal and performance IQ and under both validation protocols.
+
+The interaction between diagnosis and cognitive ability is also tested directly, so that the
+difference between the two within-group associations is assessed in one model rather than
+inferred from their separate significance. In a model of the out-of-fold score containing IQ,
+diagnosis, their interaction, age, sex, mean framewise displacement and site, the interaction
+is negative under both protocols. Across the six-test IQ family, it survives
+Benjamini--Hochberg correction for full-scale IQ ($\beta=-0.176$, $q=0.025$) and verbal IQ
+($\beta=-0.205$, $q=0.025$) under pooled ten-fold validation, and for both measures with a
+site withheld ($q=0.033$). For performance IQ, however, the interaction does not survive
+correction under either protocol ($q=0.082$). The dependence of the score on cognitive ability
+is therefore specific to the autistic group for full-scale and verbal IQ, whereas it is not
+established for performance IQ.
+
+\begin{table}[t]
+\centering
+\caption{Spearman correlation between classifier score and IQ within each diagnostic group,
+given as $\rho$ ($p$). Both variables are residualised on site, age and mean framewise
+displacement before correlation. The p-values are not adjusted for multiplicity.}
+\label{tab:iq-correlations}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+ & & \multicolumn{2}{c}{Autistic} & \multicolumn{2}{c}{Non-autistic} \\
+\cmidrule(lr){3-4}\cmidrule(l){5-6}
+Measure & $n$ (autistic / non-autistic) & Pooled ten-fold & LOSO & Pooled ten-fold & LOSO \\
+\midrule
+Full-scale IQ & 376 / 435 & $-0.180$ (0.0004) & $-0.179$ (0.0005) & $+0.048$ (0.3208) & $+0.022$ (0.6466) \\
+Verbal IQ & 342 / 379 & $-0.182$ (0.0007) & $-0.189$ (0.0004) & $+0.039$ (0.4547) & $+0.001$ (0.9892) \\
+Performance IQ & 344 / 391 & $-0.152$ (0.0047) & $-0.147$ (0.0062) & $+0.007$ (0.8862) & $-0.005$ (0.9271) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The absence of an association in non-autistic participants constrains the interpretation of
+this result. Because no gradient is found in that group, the association is not attributed
+to a general relation between ability and classifier score. However, the two correlations
+are not compared by a direct test, and full-scale IQ varies less among non-autistic
+participants (Table~\ref{tab:participants}). For this reason, this interpretation remains
+provisional. In addition, \citet{Nielsenetal2013} report that classifier scores covary with
+verbal IQ in ABIDE data, so the association is anticipated. Beyond that report, the
+comparison with non-autistic participants and the graded loss of detectability across IQ
+bands are added by the present analysis.
+
+Taken together, these results indicate that measured performance on ABIDE-I depends on the
+cognitive composition of the autistic sample. \reviewhl{The exploratory findings do not establish an IQ-specific effect because the within-group correlations are not directly compared and the IQ-matched upper quartiles are non-monotonic.} This dependence matters because
+a cohort with a different distribution of cognitive ability \reviewhl{yields} a different AUROC
+from the same method.
+
+No deficit in discrimination is found in female participants, although this subgroup is
+small.
+Specifically, AUROC is 0.827 (0.760--0.895, $n=144$) in female participants and 0.764
+(0.730--0.798, $n=727$) in male participants under pooled ten-fold validation. Similarly,
+with the site withheld, AUROC is 0.806 (0.735--0.878) in female participants and 0.767
+(0.733--0.801) in male participants. However, the intervals overlap, so no difference
+between the sexes is claimed.
+
+\subsection{Functional-system differences under motion matching}
+\label{subsec:results-system-differences}
+
+Group differences are assessed in exploratory analyses (Sections~\ref{subsec:group-differences}
+and~\ref{subsubsec:analysis-status}), and the strengthening of the somatomotor reduction under motion
+matching is the second contribution of the study. These differences are compared at the
+level of functional systems, because the 19,110 individual connections are too many to
+test one at a time with useful power. For this purpose, the regions are grouped into the seven cortical systems of \citet{Yeoetal2011}
+and a subcortical and cerebellar class (Section~\ref{subsubsec:atlas-signal-quality}). As a result, the
+comparisons are reduced to 36 system pairs, each averaging over 21 to 1,462 connections
+(median 441). In addition, every connection is first adjusted for acquisition site, head
+motion, age and sex. Significance is then obtained by permuting diagnosis within each site
+(Sections~\ref{subsubsec:connection-adjustment}, \ref{subsubsec:system-contrasts} and~\ref{subsubsec:permutation-analyses}).
+
+In the 863 participants of the group-contrast cohort, 10 of 36 system pairs differ after
+correction, and every one of them is lower in autism (Table~\ref{tab:system-pairs};
+Figure~\ref{fig:group-differences}a). Moreover, 34 of 36 pairs are negative overall, and no pair
+is significantly raised. Among these pairs, the largest difference is found within the
+somatomotor system (standardised difference $-0.215$, $z=-4.769$, $q=0.002$). In addition,
+the limbic system is the most widely involved and differs from most other systems. Because
+site enters both the adjustment and the permutation, differences in mean connectivity
+between acquisition sites are removed before this reduction is estimated.
+
+\begin{table}[t]
+\centering
+\caption{Functional-system pairs with the largest standardised group differences in the
+group-contrast cohort (863 participants). Negative values indicate lower connectivity in
+autistic participants, and $q$ is the Benjamini--Hochberg-adjusted permutation p-value.
+The first ten rows are the pairs with $q<0.05$.}
+\label{tab:system-pairs}
+\small
+\begin{tabular}{@{}llcccc@{}}
+\toprule
+System & System & Connections & Difference & $z$ & $q$ \\
+\midrule
+Somatomotor & Somatomotor & 210 & $-0.215$ & $-4.769$ & 0.002 \\
+Limbic & Visual & 210 & $-0.140$ & $-3.633$ & 0.002 \\
+Limbic & Salience / ventral attention & 147 & $-0.133$ & $-3.247$ & 0.013 \\
+Default mode & Default mode & 903 & $-0.127$ & $-3.777$ & 0.002 \\
+Default mode & Limbic & 301 & $-0.125$ & $-3.677$ & 0.004 \\
+Limbic & Limbic & 21 & $-0.118$ & $-3.052$ & 0.014 \\
+Dorsal attention & Somatomotor & 399 & $-0.116$ & $-2.653$ & 0.024 \\
+Dorsal attention & Dorsal attention & 171 & $-0.115$ & $-2.875$ & 0.024 \\
+Limbic & Somatomotor & 147 & $-0.114$ & $-2.839$ & 0.024 \\
+Frontoparietal control & Limbic & 147 & $-0.102$ & $-2.733$ & 0.024 \\
+Somatomotor & Visual & 630 & $-0.101$ & $-2.317$ & 0.058 \\
+Frontoparietal control & Salience / ventral attention & 441 & $-0.093$ & $-2.317$ & 0.058 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The permutation certifies the p-value on residualised connections, but it does not certify
+the residualisation itself. For this reason, within-site pairs matched for mean framewise
+displacement are also analysed (Section~\ref{subsubsec:motion-matching}). This matching is needed because
+head motion alters measured connectivity \citep{Poweretal2012}, and autistic participants
+move more than non-autistic participants (Table~\ref{tab:participants}). Under the
+system-level caliper, 256 pairs are retained, and the group difference in motion is removed
+($p=7.6\times10^{-7}$ before matching and $p=0.59$ after). In these matched pairs, 26 of 36
+system pairs are significant, against 10 of 36 in the full group-contrast cohort
+(Figure~\ref{fig:group-differences}b). However, the matched sample also differs from the full
+cohort in size and composition, so the rise is not attributed to motion matching alone. In
+addition, the somatomotor within-system difference strengthens from $-0.2155$ ($z=-4.77$)
+in all participants to $-0.2925$ ($z=-4.89$) in the matched pairs. Age, however, is not
+matched and is handled by adjustment alone, so the matched analysis addresses head motion
+rather than age.
+
+Inside the somatomotor system, the effect is spread across its 21 regions rather than
+concentrated in one (Supplementary Material). Specifically, all 21 regions differ
+significantly in all participants, and the strongest effects lie in the postcentral gyrus,
+the paracentral lobule and the precentral gyrus. In anatomical terms, these regions form
+primary somatosensory and motor cortex, and they are affected on both sides to a similar
+degree. However, this regional analysis is exploratory, because the system is chosen for
+carrying the largest system-level difference (Section~\ref{subsubsec:regional-analysis}). Its ordering is,
+therefore, a description of that result rather than an independent test of it.
+
+The regional result also \reviewhl{persists after matching on recorded mean FD and is larger in the matched sample}.
+Specifically, 280 pairs (560 participants) are retained by the wider regional caliper, and
+the motion difference is again removed ($p=0.28$ after matching). Under this matching, all 21
+regions remain significant, every one of them strengthens, and their ordering is preserved
+(rank correlation 0.89 against the unmatched result). Moreover, the mean regional effect moves from $-0.215$ in all 863
+participants to $-0.249$ in the matched pairs
+(Figure~\ref{fig:group-differences}c).
+
+The same conclusions are obtained when the tests are repeated under the Freedman--Lane
+residual permutation, which holds the association between diagnosis and the covariates fixed
+(Section~\ref{subsubsec:permutation-analyses}). Under that procedure, the number of system
+pairs with reduced connectivity and $q<0.05$ rises from 14 to 27 of 36 after motion matching,
+and every one of those pairs is negative. The somatomotor pair itself strengthens from
+$-0.226$ to $-0.294$. In addition, all 21 somatomotor regions remain significant at $q<0.05$
+in both the full and the matched analyses, and the mean regional effect strengthens from
+$-0.226$ to $-0.294$. The direction, the strengthening under motion matching, and the
+involvement of every region are therefore not artefacts of the exchangeability assumption
+used in the primary tests.
+
+The regional ordering is moderately reproducible within the cohort, and this reproducibility
+\reviewhl{indicates the reliability of the regional ranking}. Specifically, a correlation of
+0.55 across the 21 regions is obtained in repeated split-half analyses, with the nuisance
+adjustment refitted in each half. In comparison, the ordering of the 210 connections inside the
+system reproduces at 0.38, and that of its top fifty at 0.34. In addition, 100 random
+blocks of 21 regions drawn from the whole brain give a median of 0.35 (range 0.06--0.63),
+and 9\% of them reach the somatomotor value. The ordering is, therefore, more stable than
+most blocks of equal size, but not categorically so.
+
+The reduction runs against the direction expected from residual motion. Specifically, mean
+framewise displacement correlates positively with mean connection strength ($\rho=+0.51$
+across participants and $+0.45$ within site). Higher motion is, therefore, associated with
+higher rather than lower connectivity in this pipeline. Because autistic participants move
+more, residual motion would on average be expected to raise their connectivity, which is
+opposite to the observed reduction. In addition, the somatomotor location of the difference
+agrees with the somatomotor involvement reported by \citet{Chenetal2015}. Its direction
+also agrees with the somatomotor reductions reported by \citet{Holigaetal2019} and
+\citet{Ilioskaetal2023} in samples that include ABIDE data. Because those samples \reviewhl{could}
+share participants with the present cohort, this agreement is not an independent
+replication. The present result, in contrast, is obtained in within-site pairs matched for
+head motion.
+
+These group differences carry three limits. First, residual motion is not a sufficient
+explanation for them, but it is not thereby excluded as a contributor. Second, the
+contrasts are univariate and are computed without reference to the classifier, so they
+support no statement about which measurements the classifier uses. Finally, all group
+differences are obtained under a single denoising strategy without global signal
+regression, so their direction is conditional on that choice.
+
+\subsection{Feature-selection scope and granularity}
+\label{subsec:results-selection-scope}
+
+The effect of data-access scope on measured performance is examined in seven conditions.
+Among these conditions, the inflation produced by feature selection outside the training
+partition, and its dependence on feature granularity, form the third contribution. For
+this purpose, the conditions are compared on identical folds with the 19,900 static tangent
+features of the primary cohort (Section~\ref{par:selection-scope}; Table~\ref{tab:selection-scope}). Under
+this design, fold-mean AUROC is changed by at most 0.003 when the tangent reference, or the
+reference and the scaler, is fitted on all participants. Similarly, it is changed by a
+similar amount when the regularisation constant is chosen on the held-out fold (0.758) or
+when acquisition site is added as a predictor (0.756).
+
+\begin{table}[t]
+\centering
+\caption{Fold-mean AUROC under the seven data-access conditions, with 19,900 static tangent
+features in the primary cohort (871 participants) and identical outer folds. SD is the
+standard deviation across outer folds.}
+\label{tab:selection-scope}
+\small
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.62\linewidth}cc@{}}
+\toprule
+Condition & AUROC & SD \\
+\midrule
+Reference: every step fitted within the training partition & 0.756 & 0.048 \\
+Tangent reference fitted on all participants & 0.756 & 0.048 \\
+Tangent reference and scaler fitted on all participants & 0.753 & 0.049 \\
+Regularisation constant chosen on the held-out fold & 0.758 & 0.048 \\
+Acquisition site added as a predictor & 0.756 & 0.049 \\
+Tangent reference fitted on all participants and 2,000 of 19,900 connections selected with all diagnostic labels & 0.987 & 0.008 \\
+All five changes combined & 0.988 & 0.008 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+In contrast, fold-mean AUROC is raised from 0.756 to 0.987 when 2,000 of 19,900 connections
+are selected with an F test on all diagnostic labels before splitting. Likewise, accuracy
+rises from 0.692 to 0.948 on the same folds. Because fitting the tangent reference on all
+participants leaves AUROC at 0.756 on its own, this rise is attributed to the selection
+step. As a result, an inflation of 0.231 in AUROC is produced by this step, and this
+inflation is the largest effect in the study. Moreover, 0.988 is obtained when every change
+is applied together, so the remaining changes add little beyond the selection step.
+Therefore, of the changes examined, only feature selection with all labels changes the
+score by more than 0.003. By comparison, choosing the regularisation constant on the
+held-out fold also uses held-out labels, but its effect lies within 0.003. As a
+consequence, figures from pipelines that select connections before cross-validation are
+not comparable with estimates in which selection is nested.
+
+Selection at the level of whole regions, in contrast, gives no consistent advantage
+(Table~\ref{tab:region-selection}; Figure~\ref{fig:corrections}c). For this comparison, regions
+are ranked either with all diagnostic labels or with the labels of each training fold only
+(Section~\ref{par:selection-scope}). Under this design, the two scopes differ by 0.006 on average in
+absolute value across 10 to 100 of 196 regions. Specifically, the difference is 0.001 at 10
+regions and at most 0.012 at 100 regions, and its sign is inconsistent. Therefore, the risk
+of a selection step depends on feature granularity. In particular, a choice of 10 of 196
+regions is too coarse to fit noise, whereas a choice of 2,000 of 19,900 connections is not.
+
+This conclusion does not depend on the scope of the nuisance adjustment used for the ranking.
+When the nuisance model is refitted within each outer-training partition, so that no held-out
+participant contributes to the residuals from which the regions are ranked
+(Section~\ref{par:selection-scope}), the AUROC of the training-fold condition changes by 0.0035
+on average in absolute value, and by at most 0.0085 at any list length. The ordering across
+list lengths is preserved, and every restricted model remains below the model that keeps all
+196 regions (0.781). The comparison is therefore unchanged by making the selection strictly
+nested.
+However, the two comparisons also differ in cohort (871 against 863 participants),
+additional shrinkage, ranking statistic and AUROC summary (Section~\ref{par:selection-scope}). For
+this reason, the contrast is consistent with an effect of granularity, but granularity is
+not the only difference between the two comparisons.
+
+\begin{table}[t]
+\centering
+\caption{Participant-pooled AUROC when the top-ranked regions are chosen with all
+diagnostic labels or with the labels of each training fold only, in the group-contrast
+cohort (863 participants and 196 regions). All 196 regions give 0.781.}
+\label{tab:region-selection}
+\small
+\begin{tabular}{@{}ccc@{}}
+\toprule
+Regions kept & Chosen with all labels & Chosen within each fold \\
+\midrule
+10 & 0.628 & 0.627 \\
+20 & 0.660 & 0.656 \\
+30 & 0.699 & 0.702 \\
+50 & 0.738 & 0.748 \\
+100 & 0.764 & 0.752 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[pos=tbp]
+\centering
+\includegraphics[width=\linewidth]{fig_corrections}
+\caption{Four effects that change when the corresponding control is applied. (a)
+Correlation between classifier score and symptom severity under pooled ten-fold validation,
+computed across both groups and within the autistic group; rows marked with a dagger are
+instruments given only to autistic participants, for which the two scopes necessarily coincide.
+(b) AUROC of whole-scan connectivity across shrinkage levels, with the windowed
+representation placed at the shrinkage that it applies to its own windows. (c) AUROC
+inflation from selection outside the training partition, for 10 to 100 of 196 regions and
+for 2,000 of 19,900 connections. (d) Observed accuracy against the interval of accuracy
+attainable given the diagnostic labels.}
+\label{fig:corrections}
+\end{figure}
+
+Restricting the model to the most discriminating regions also lowers performance at every
+list length. Specifically, all 196 regions give an AUROC of 0.781, which is higher than any
+reduced set in Table~\ref{tab:region-selection}. In particular, the smallest set loses 0.154
+against the use of every region. This pattern, in turn, suggests that the information used
+for discrimination is spread across many regions rather than confined to those with the
+largest group differences. Consequently, a reduced set of regions does not improve
+discrimination on these data, and this restriction is reported as a limit.
+
+Without any selection before the split, the published accuracy range is already reached by
+the ensemble. Specifically, a participant-pooled accuracy of 0.706 is obtained in the wider
+cohort under pooled ten-fold validation (Section~\ref{subsec:results-performance}). This value is
+comparable to the 0.700, 0.703 and 0.708 reported for the same eligible count of 1,035
+participants. Accuracy at that level, therefore, does not require selection
+outside the training partition.
+
+\subsection{Classifier family}
+\label{subsec:results-classifier-family}
+
+Linear classifiers outperform the fixed-configuration tree ensembles on static tangent
+connectivity, and this result is the fourth contribution. For this comparison, all eight
+classifiers use the same features, feature scaling and outer folds
+(Section~\ref{par:classifier-family}), so differences are not confounded by the input or the partition.
+Under this design, participant-pooled AUROCs of 0.735--0.757 are reached by the five linear
+classifiers, whereas 0.611--0.624 is reached by random forest, XGBoost and CatBoost
+(Table~\ref{tab:classifier-family}). In particular, 0.757 is reached by penalised logistic
+regression, and ridge (0.755) and linear support-vector classification (0.753) lie close to
+it.
+In contrast, shrinkage linear discriminant analysis (0.741) and the rank-20 spectral model
+(0.735) are lower.
+
+\begin{table}[t]
+\centering
+\caption{Classifier family on the static tangent features of the primary cohort
+(871 participants), with identical features, scaling and outer folds. Only logistic
+regression is tuned; the other classifiers use fixed configurations.}
+\label{tab:classifier-family}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Classifier & AUROC (participant-pooled) & AUROC (fold mean) & SD (folds) & Accuracy (fold mean) \\
+\midrule
+Logistic regression & 0.757 & 0.756 & 0.048 & 0.692 \\
+Ridge & 0.755 & 0.755 & 0.047 & 0.693 \\
+Linear support-vector & 0.753 & 0.753 & 0.048 & 0.687 \\
+Shrinkage LDA (PCA-200) & 0.741 & 0.739 & 0.052 & 0.669 \\
+Low-rank spectral (rank 20) & 0.735 & 0.737 & 0.044 & 0.672 \\
+CatBoost & 0.624 & 0.623 & 0.042 & 0.597 \\
+XGBoost & 0.617 & 0.616 & 0.050 & 0.584 \\
+Random forest & 0.611 & 0.609 & 0.049 & 0.577 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The gap between logistic regression and each tree ensemble is large relative to its
+uncertainty. Specifically, the participant-pooled AUROC of logistic regression is higher
+than that of XGBoost by 0.1396, of random forest by 0.1461 and of CatBoost by 0.1327. For these differences,
+unadjusted DeLong p-values range from $6.3\times10^{-15}$ to $2.4\times10^{-12}$
+(Section~\ref{subsubsec:paired-comparisons}). By comparison, the rank-20 spectral model lies 0.0214 below
+logistic regression (unadjusted $p=0.0439$; $q=0.1065$, for reference only).
+
+This contrast characterises the configurations evaluated rather than the best attainable
+member of each family. Specifically, only the logistic model is tuned, whereas the tree
+ensembles use fixed configurations without nested tuning (Section~\ref{par:classifier-family}).
+However, the fixed-configuration ridge, linear support-vector and discriminant classifiers
+also exceed all three tree ensembles. Therefore, the advantage of these linear
+configurations over these tree-ensemble configurations does not rest on the tuning of the
+logistic model alone.
+
+\subsection{Scope of the symptom-severity associations}
+\label{subsec:results-symptom-severity}
+
+Under pooled ten-fold validation, no association between the classifier score and symptom
+severity survives correction within the autistic group, and this absence forms the
+fifth contribution of the study (Figure~\ref{fig:corrections}a). For this question, the correlation is computed in
+two scopes, namely across both groups and within the autistic group only. The second scope
+is needed because non-autistic participants who complete these instruments score at the
+low end of the scale. In this cohort, for example, 19 non-autistic participants have an
+ADOS total and 137 an SRS total. For this reason, any model that separates the groups
+produces a correlation across both groups largely by construction. Consistent with this, 3
+of 6 associations survive Benjamini--Hochberg correction across both groups, whereas 0 of 6
+do within the autistic group (Section~\ref{par:symptom-associations}).
+
+The largest association across both groups almost vanishes once non-autistic participants
+are removed. Specifically, for the SRS total, a correlation with the classifier score of
+$\rho=0.438$ is obtained across both groups ($n=300$), but of 0.050 within the autistic
+group ($n=163$). Similarly, values of 0.207 against 0.115 are obtained for the ADOS total,
+and of 0.196 against 0.128 for the ADOS calibrated severity. In contrast, identical
+correlations in both scopes are obtained for the ADI-R domains, which are given only to
+autistic participants, because both scopes contain the same people. Therefore, the
+correlations across both groups reflect the separation of the groups. An association with
+the degree of autism within the autistic group, in turn, is not established by these data.
+
+\subsection{Windowed connectivity and covariance shrinkage}
+\label{subsec:results-windowed-shrinkage}
+
+The small advantage of the windowed representation is not distinguished from chance, and it
+is not retained when the whole-scan estimate receives the same covariance shrinkage; this
+result is the sixth contribution (Figure~\ref{fig:corrections}b). Specifically, an extra shrinkage of 0.15 is applied by
+the windowed representation to its window covariances, and this shrinkage is not received
+by the whole-scan representation (Section~\ref{subsubsec:primary-comparisons}). For this reason, the same
+shrinkage is applied to the whole-scan estimate, with nothing else changed. Under this
+control, the static AUROC is raised by 0.013 through shrinkage alone (unadjusted DeLong
+$p=0.004$). In contrast, the windowed representation differs from the unshrunk static
+baseline by 0.010 ($p=0.281$) and from the matched static baseline by $-0.002$
+($p=0.709$). Therefore, no evidence is obtained that windowing adds information beyond the
+shrinkage that it applies, and the apparent benefit of windowing is attributed to that
+shrinkage.
+
+\subsection{Secondary results}
+\label{subsec:results-secondary}
+
+The remaining analyses are reported as descriptive results, and none of them is claimed as
+a contribution. In the first of these, the ensemble probabilities have \reviewhl{low ten-bin expected calibration error}
+under both protocols (Figure~\ref{fig:performance}c). Specifically, the
+expected calibration error of Equation~\eqref{eq:calibration-error} is 0.046 under pooled ten-fold
+validation and 0.040 under leave-one-site-out validation. In addition, these values are
+computed from participant-pooled predictions, for which accuracy is 0.707 and 0.711,
+respectively. Because this error is the bin-weighted mean gap between predicted probability
+and observed frequency, small values indicate agreement on average. However, a small error
+does not guarantee agreement within every probability bin \reviewhl{or establish calibration without slope, intercept, Brier-score, and uncertainty analyses}, so the reliability diagram is
+also shown.
+
+Measures that do not depend on binning give the same picture, with one exception. The
+calibration slope is 1.117 (95\% site-clustered bootstrap interval 0.866 to 1.321) under
+pooled ten-fold validation and 1.119 (0.856 to 1.349) with a site withheld, so both intervals
+include one and the probabilities are neither over- nor under-dispersed. The Brier score is
+0.194 under both protocols. Calibration-in-the-large, however, is $-0.162$ ($-0.282$ to
+$-0.061$) under pooled ten-fold validation, and this interval excludes zero, so the average
+predicted risk is slightly above the observed rate. With a site withheld the corresponding
+value is $-0.181$ ($-0.385$ to $0.019$). The binned error itself depends on the binning,
+rising from 0.037 at five bins to 0.046 at ten and 0.059 at twenty, where some bins contain no
+participants. The expected calibration error is therefore reported with its bin count rather
+than as a single figure.
+
+Calibration, however, does not translate into a useful guarantee on the cases that the
+model chooses to answer (Figure~\ref{fig:performance}d; Figure~\ref{fig:abstention-guarantee}). To
+test such a guarantee, the leave-one-site-out predictions are divided at random into two
+halves, and the threshold is chosen on one half and applied to the other
+(Section~\ref{subsubsec:threshold-analysis}). This division is needed because a threshold scored on the
+participants that set it passes its bound by construction. When the cohort-wide threshold
+is set on the whole sample, however, no participant is answered. In addition, under the
+half-split test, the target is met in a proportion of 0.8158 of the 38 half-splits with a
+finite selective risk, which is below the nominal 0.90.
+
+\begin{figure}[pos=tbp]
+\centering
+\includegraphics[width=\linewidth]{fig_guarantee}
+\caption{The error guarantee of the abstention rules under leave-one-site-out validation and
+its evaluation on held-out participants. (a) The error bound that each rule reports on the participants used to set
+it, against the error that the same rules incur on held-out cases. (b) The cost of each
+rule for obtaining that bound: the proportion of cases it answers, and the proportion of
+held-out splits in which it meets its target.}
+\label{fig:abstention-guarantee}
+\end{figure}
+
+The target is held by the per-site threshold, but few participants are answered by it.
+Specifically, when it is set on the whole sample, 170 of 871 participants (19.5\%) are
+answered, and 143 of them are at a single site. Moreover, no participant is answered at 17
+of the 20 sites. Across held-out half-splits, in addition, its mean coverage, the
+proportion of participants answered, is 13.7\%, and the target is met in a proportion of
+0.9137 of 197 valid splits. Abstention is, therefore, reported as a
+measurement on these data rather than as a feature of the model.
+
+Describing connectivity with more than one atlas does not improve discrimination either.
+Specifically, a fold-mean AUROC of 0.756 is reached by CC200 alone, against 0.749 for CC200
+with the anatomical labelling atlas, 0.755 for CC200 with the Harvard--Oxford atlas, and
+0.752 for all three together (Section~\ref{par:atlas-fusion}). In addition, each anatomical
+atlas reaches less on its own, namely 0.692 and 0.717. The functional parcellation
+therefore carries the information that the combinations provide, and no gain is obtained
+from adding atlases.
+
+The diagnostic labels themselves limit attainable accuracy, but the size of this limit
+cannot be fixed from these data (Figure~\ref{fig:corrections}d). To estimate it, the two
+diagnostic instruments are compared in the 213 autistic participants with both a complete
+ADI-R algorithm and an ADOS total (Section~\ref{par:instrument-concordance}). Under this comparison, the
+instruments disagree in 15.0\% of these participants. Specifically, 13 meet criteria on the
+interview only, 19 on the observation only and 181 on both, whereas no participant is
+negative on both instruments. Under the
+assumptions of Section~\ref{par:instrument-concordance}, the accuracy attainable against these labels
+therefore lies between approximately 0.85 and 0.99. Observed accuracy, in turn, lies 0.14
+below even the lower end of that range.
+
+At the central noise rates, correction for label noise does not close this gap. These
+central rates are the values defined in Section~\ref{par:instrument-concordance}, namely half the observed
+disagreement and the proportion of non-autistic participants with an SRS raw total of at
+least 60. Specifically, when the correction of \citet{Menonetal2015} is applied at these
+rates, accuracy is moved from 0.707 to 0.729, and AUROC from 0.776 to 0.806. The shortfall
+is, therefore, not explained by uncertainty in the diagnosis alone. However, at the most pessimistic rates the correction is larger, so the size of the
+remaining gap depends on assumptions that these data cannot settle. In particular,
+agreement beyond chance is slightly negative (Cohen's $\kappa=-0.078$), which is
+inconsistent with the two-rater model that the correction assumes. Moreover, two
+instruments applied to one population do not identify their error rates, and, as noted above, no participant is negative on both. For these
+reasons, no point
+estimate of the ceiling is reported.

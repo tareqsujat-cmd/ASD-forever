@@ -1,0 +1,162 @@
+\documentclass[a4paper,fleqn]{cas-sc}
+
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage[
+  colorlinks=true,
+  linkcolor=blue,
+  citecolor=blue,
+  urlcolor=blue
+]{hyperref}
+
+\begin{document}
+\let\WriteBookmarks\relax
+\def\floatpagepagefraction{1}
+\def\textpagefraction{.001}
+
+\shorttitle{CLEAR-ASD}
+\shortauthors{Author et al.}
+
+\title[mode=title]{CLEAR-ASD: Calibrated and Interpretable Autism Classification from Functional Connectomes}
+
+\author[1]{First Author}
+\cormark[1]
+\ead{author1@example.com}
+\credit{Conceptualization, Methodology, Software, Formal analysis, Writing -- original draft}
+
+\author[1]{Second Author}
+\ead{author2@example.com}
+\credit{Methodology, Validation, Writing -- review \& editing}
+
+\affiliation[1]{organization={Department of Computer Science and Engineering, BRAC University},
+            addressline={Kha 224 Bir Uttam Rafiqul Islam Avenue},
+            city={Dhaka},
+            postcode={1212},
+            country={Bangladesh}}
+
+\cortext[1]{Corresponding author}
+
+\begin{abstract}
+Autism spectrum disorder (ASD) classification from resting-state functional magnetic resonance imaging (rs-fMRI) remains difficult because functional-connectivity representations are high dimensional, multisite acquisition introduces substantial heterogeneity, and high average discrimination does not necessarily imply reliable confidence on individual predictions. A reliability-oriented connectome framework is therefore proposed using Autism Brain Imaging Data Exchange I (ABIDE-I) data. Functional connectivity is represented through regularized covariance matrices and tangent-space projection, while static and windowed connectivity descriptions are evaluated under leakage-controlled pooled and leave-one-site-out cross-validation. Predictions obtained from multiple connectivity descriptions are combined, and a regularized linear classifier is used so that whole-brain decision patterns remain directly interpretable. Probability calibration and selective prediction are further incorporated so that uncertain cases may be withheld rather than forced into a decision. The methodology is designed to test whether improved reliability can be obtained through representation, cross-site validation, calibrated confidence, and compact connectome structure rather than through classifier complexity alone. The wider quality-control cohort reaches an area under the receiver operating characteristic curve of 0.79 and an accuracy of 0.72 for the fixed connectivity combination, while cross-site performance remains nearly unchanged. The framework is intended as a screening-oriented bioinformatics pipeline rather than a replacement for clinical diagnosis.
+\end{abstract}
+
+\begin{highlights}
+\item Static and dynamic functional-connectivity descriptions are evaluated within one leakage-controlled framework.
+\item Cross-site generalization is tested through leave-one-site-out validation without relying on acquisition site as a predictor.
+\item Calibrated selective prediction is used so uncertain cases can be withheld under a stated error target.
+\end{highlights}
+
+\begin{keywords}
+Autism spectrum disorder \sep Functional connectome \sep Resting-state fMRI \sep Bioinformatics \sep Calibration \sep Selective prediction
+\end{keywords}
+
+\maketitle
+
+\section{Introduction}
+\label{sec:introduction}
+
+Autism spectrum disorder (ASD) is a neurodevelopmental condition affecting social communication and behaviour, identified in approximately one in thirty-six children in recent surveillance estimates (Maenner et al., 2023). Diagnosis rests on structured behavioural assessment by trained clinicians, using instruments such as the Autism Diagnostic Observation Schedule (Lord et al., 2000). These instruments are well validated, and they are also demanding: a full assessment requires specialist time, direct observation of the child, and clinical judgement integrated across several sources of information.
+
+The practical consequence is delay. Although a reliable diagnosis is achievable in the third year of life, the age at which children actually receive one is typically several years later, and referral pathways in many regions carry substantial waiting times. This matters because the interventions that improve long-term outcomes are most effective when they begin early (Zwaigenbaum et al., 2015). A measurement that could be obtained without behavioural assessment, and that could indicate which children warrant specialist referral, would therefore be of practical value — not as a replacement for clinical diagnosis, but as a means of directing limited specialist capacity towards the children most likely to need it.
+
+Resting-state functional magnetic resonance imaging (rs-fMRI) offers one route to such a measurement. In a resting scan the participant is asked only to lie still, so the acquisition requires no task compliance and is feasible in young and clinical populations. From the recorded signal one can compute *functional connectivity*: the degree to which activity in each pair of brain regions varies together over the scan. Because ASD is understood as a condition of distributed brain systems rather than of any single region, connectivity between regions is a natural quantity in which to look for group differences.
+
+Progress in this direction was made possible by the Autism Brain Imaging Data Exchange (ABIDE), which aggregated rs-fMRI and phenotypic data from around twenty international sites and released them openly (Di Martino et al., 2014), together with the preprocessed derivatives distributed by the Preprocessed Connectomes Project (Craddock et al., 2013). A substantial body of work has since used these data to classify ASD from connectivity. Studies have examined which connectivity parametrisation carries the most predictive signal (Abraham et al., 2017; Dadi et al., 2019), and have applied a range of estimators including regularised linear models, deep autoencoders (Heinsfeld et al., 2018), convolutional architectures designed for connectome data (Kawahara et al., 2017), and graph neural networks that model the cohort as a population graph (Parisot et al., 2018). Together this work has established that a group-level signal is present and detectable, has produced a set of reference results on a common dataset, and has characterised the principal difficulty: the data are pooled across sites whose scanners and protocols differ, so a model must separate the connectivity differences associated with diagnosis from those associated with acquisition.
+
+Three questions remain open, and they define the scope of the present work.
+
+The first concerns what is measured. Connectivity is usually summarised by a single matrix per participant, computed over the entire scan. Connectivity also varies within a scan in a way that is measurable and reproducible (Hutchison et al., 2013; Preti et al., 2017), and reduced stability of network configurations has been reported in ASD (Watanabe & Rees, 2017). Describing how connectivity is arranged *and* how it changes therefore offers additional information, provided the description is constructed so that it is comparable between participants whose scans differ in length.
+
+The second concerns the form of the classifier. A connectivity vector for a 200-region atlas contains 19,900 entries, an order of magnitude more than the number of participants available. Those entries are not an unstructured list; they are the entries of a symmetric matrix. A classifier that represents this structure explicitly can express the same decision with far fewer parameters, and its parameters can be displayed as whole-brain patterns rather than as thousands of individual weights.
+
+The third concerns how a prediction is delivered. For a screening instrument, a probability that can be read as a frequency, and the option to decline to answer when the evidence is weak, are as consequential as the average accuracy. A stated error rate that holds for the cases the model actually answers — including at a site the model has not seen — is the property that determines whether the output can be acted upon.
+
+\section{Related Work}
+\label{sec:related}
+
+Research on autism spectrum disorder (ASD) classification from resting-state functional magnetic resonance imaging (rs-fMRI) has developed from statistical modelling and functional-connectivity representation toward multisite learning, deep architectures, dynamic connectivity, multimodal fusion, and reliability-aware prediction. Early studies establish how high-dimensional covariance and brain-network information can be represented, while later studies focus on improving classification through deep learning, multiple atlases, temporal modelling, and graph-based methods. In parallel, calibration, interpretability, selective prediction, and statistical validation are introduced to improve the reliability of machine-learning decisions. Together, these developments show that improved ASD classification depends not only on model complexity, but also on how connectivity is represented, how site variation is controlled, and how prediction uncertainty is evaluated.
+
+\subsection{Foundations of Functional Connectome-Based Analysis}
+
+Several statistical developments establish the basis for later connectome-based ASD classification. Exact confidence limits for binomial outcomes are introduced in \cite{ClopperPearson1934}, providing a foundation for later error-control procedures. High-dimensional covariance estimation is subsequently improved through Ledoit--Wolf shrinkage \cite{LedoitWolf2004}. This is particularly relevant to rs-fMRI because covariance matrices must often be estimated from a limited number of time points while many brain regions are represented.
+
+Reliable model comparison is further addressed through statistical procedures for comparing classifiers \cite{Demsar2006}. Dataset-level variation is addressed through the ComBat empirical-Bayes framework \cite{Johnsonetal2007}, originally developed for batch-effect correction. Although this method is not introduced for neuroimaging, the same principle later becomes useful for correcting scanner- and site-related variation.
+
+The geometric structure of covariance matrices is then considered more directly. Group-level covariance modelling is introduced in \cite{Varoquauxetal2010}, where covariance matrices are treated according to their non-Euclidean geometry. This provides the basis for tangent-space representations that later become important in functional-connectome prediction. At a biological level, seven large-scale intrinsic brain networks are identified in \cite{Yeoetal2011}, allowing thousands of individual connections to be interpreted according to broader functional systems.
+
+These developments establish a strong basis for static functional-connectivity analysis. However, connectivity estimated across an entire scan assumes that brain-network relationships remain stable over time. This assumption is challenged by dynamic functional-connectivity research \cite{Hutchisonetal2013}, where temporal changes in network organisation are shown to contain additional information. Thus, the field begins to move from a single static connectivity representation toward both spatial and temporal descriptions of brain networks.
+
+\subsection{Multisite ASD Data and Reproducibility}
+
+Large-scale ASD neuroimaging research is substantially advanced through the release of the Autism Brain Imaging Data Exchange (ABIDE) \cite{DiMartinoetal2014}. Data from multiple international sites are combined, making much larger ASD classification studies possible. However, this advantage also introduces a major methodological difficulty. Scanner type, acquisition protocol, demographic composition, and site-specific characteristics vary across centres, so prediction models can learn acquisition differences instead of ASD-related neural patterns.
+
+The structure of high-dimensional predictors is further addressed through regularised matrix regression \cite{ZhouLi2014}, where matrix information is preserved rather than converted into an unrestricted feature list. Dynamic-connectivity estimation is also examined more critically in \cite{LeonardiVanDeVille2015}. Sliding-window analysis is shown to be sensitive to window length, and apparent connectivity changes can arise from methodological choices rather than genuine neural variation. Therefore, temporal information can only be useful when scan-length and window-design effects are carefully controlled.
+
+The problem of reproducibility becomes more explicit in multisite ASD research. Reproducible biomarkers are investigated using multisite resting-state data in \cite{Abrahametal2017}, where performance is shown to depend strongly on preprocessing, feature construction, and validation design. Dynamic-connectivity research is further consolidated in \cite{Pretietal2017}, where the advantages and limitations of time-varying functional connectomes are reviewed. Together, these works shift attention from whether ASD can be classified toward whether the learned signal remains stable across participants, preprocessing choices, and sites.
+
+\subsection{Reliability, Calibration, and Explainability}
+
+While neuroimaging studies focus on representation and generalisation, reliability-oriented machine-learning methods are developed in parallel. Probability calibration is examined in \cite{Guoetal2017}, where high classification accuracy is shown not to guarantee reliable confidence estimates. A model may therefore produce a correct ranking of participants while assigning probabilities that do not reflect actual prediction frequencies.
+
+Selective classification is introduced in \cite{GeifmanElYaniv2017} to address this limitation from another direction. Instead of forcing a prediction for every input, uncertain cases are allowed to be rejected. This creates a trade-off between coverage and prediction error, which is particularly relevant to screening applications where an uncertain case can be referred for further clinical assessment.
+
+Interpretability is strengthened through SHAP \cite{LundbergLee2017}, where individual feature contributions can be assigned to a prediction. These developments extend evaluation beyond conventional accuracy. Calibration determines whether confidence values are meaningful, selective prediction determines when a prediction should be issued, and explanation methods indicate which features contribute to the decision.
+
+Clinical usefulness is later considered through decision-curve analysis \cite{VanCalsteretal2018}, where statistical performance is separated from practical decision value. Consequently, reliable ASD classification becomes increasingly dependent on more than discrimination alone.
+
+\subsection{Deep Learning for ASD Classification}
+
+Deep learning is applied directly to ABIDE functional-connectivity data in \cite{Heinsfeldetal2018}. Distributed connectivity patterns are learned automatically, and approximately 70.0\% accuracy is reported. This demonstrates that ASD-related information can be extracted through deep feature learning. However, increased architectural complexity does not remove the multisite variation introduced by ABIDE.
+
+Site-related variability is addressed separately through neuroimaging harmonisation \cite{Fortinetal2018}, where ComBat is adapted for scanner and site correction. This provides a direct mechanism for reducing acquisition-related differences while attempting to preserve biological variation. However, harmonisation introduces another learned transformation into the pipeline, meaning that its effect must be estimated without using held-out test information.
+
+A further deep model is introduced through ASD-DiagNet \cite{Eslamietal2019}. Representation learning and classification are combined, producing approximately 70.3\% accuracy. The improvement over earlier deep learning remains modest. This raises an important question: whether performance is being limited by classifier architecture or by the underlying functional-connectivity representation.
+
+This issue is directly examined through benchmarking in \cite{Dadietal2019}. Multiple connectome representations and predictive models are compared under controlled conditions, and tangent-space connectivity is identified as a strong representation. This finding is important because a suitable representation allows comparatively simple classifiers to remain competitive with nonlinear methods. As a result, increased model complexity is no longer automatically associated with improved ASD classification.
+
+Sparse representation learning is explored further through ASD-SAENet \cite{AlmuqhimSaeed2021}. A sparse autoencoder is combined with a deep neural network and approximately 70.8\% accuracy is reported. Although another improvement is obtained, the progression from 70.0\% to 70.3\% and then 70.8\% remains relatively small. This suggests that deeper representation learning alone does not fully resolve the difficulties associated with heterogeneous multisite rs-fMRI data.
+
+\subsection{Evidence from Systematic Reviews}
+
+The broader performance of rs-fMRI machine-learning methods is examined through a systematic review and meta-analysis in \cite{Santanaetal2022}. Moderate pooled sensitivity, specificity, and discrimination are reported, while considerable methodological heterogeneity is identified. Differences in preprocessing, sample selection, validation strategy, feature extraction, and classifier design make direct comparison between studies difficult.
+
+A later systematic review of deep-learning and rs-fMRI biomarkers \cite{Hudaetal2024} reports continued methodological development but identifies similar limitations related to generalisability, reproducibility, and inconsistent evaluation. These reviews provide an important analytical perspective: higher accuracy reported by an individual model cannot be interpreted independently of the dataset definition and experimental pipeline used to obtain it.
+
+Therefore, later ASD classification studies increasingly attempt to improve the representation itself rather than only increasing classifier depth.
+
+\subsection{Multi-Atlas and Dynamic Connectivity Models}
+
+Dependence on a single brain parcellation is addressed through MADE-for-ASD \cite{Liuetal2024MADE}. A multi-atlas deep ensemble is introduced, and approximately 75.2\% accuracy is reported. Different atlases describe the same brain according to different regional boundaries, so their predictions may contain complementary information. Multi-atlas fusion therefore provides a possible way to reduce dependence on one predefined parcellation.
+
+However, the improvement is introduced together with a more complex ensemble architecture. It therefore becomes difficult to determine whether performance is improved because of atlas diversity, deep-model capacity, demographic information, or their interaction. This motivates controlled evaluations in which atlas fusion is varied while the remaining pipeline is kept unchanged.
+
+Dynamic functional connectivity is later revisited through a GNN-LSTM framework \cite{Tangetal2025GNNLSTM}. Graph neural networks are combined with temporal sequence modelling, and approximately 80.4\% accuracy is reported on ABIDE-I. Compared with static approaches, connectivity variation across the scan is explicitly represented rather than being averaged into one matrix.
+
+This development addresses an important limitation of static functional connectivity, but it introduces several additional decisions. Window length, overlap, temporal ordering, graph construction, and sequence-model complexity can all affect performance. Therefore, the contribution of temporal variation should be separated from the contribution of the classifier through controlled ablation.
+
+\subsection{Explainable and Multimodal ASD Models}
+
+Interpretability receives greater attention in recent ASD classification research. Explainable artificial intelligence is applied to ABIDE fMRI data in \cite{Vidyaetal2025}, where highly predictive performance is reported under the stated filtering condition and influential brain regions are identified through multiple explanation methods. Such work demonstrates the potential of connecting prediction with biologically interpretable patterns.
+
+However, unusually high performance on heterogeneous multisite data also increases the importance of strict validation. Feature selection, filtering, preprocessing, and cross-validation must remain independent of held-out data. The broader lesson from earlier benchmarking \cite{Dadietal2019} and meta-analysis \cite{Santanaetal2022} therefore remains relevant: reported performance must be interpreted together with the complete experimental procedure.
+
+The progression toward richer representations continues through CAS-GNN \cite{Tangetal2026CASGNN}. Structural and functional MRI are integrated using cross-attention and subject-adaptive graph construction, and approximately 79.3\% accuracy is reported. Compared with earlier functional-connectivity-only approaches, multimodal information is used to represent each participant more comprehensively.
+
+Although multimodal graph learning increases representational capacity, additional learned components also make generalisation more difficult to assess. Performance gains must therefore be evaluated against cross-site stability, model complexity, and potential overfitting.
+
+\subsection{Research Gap}
+
+The literature shows two connected methodological developments. The first progresses from stable covariance estimation \cite{LedoitWolf2004}, geometric connectivity modelling \cite{Varoquauxetal2010}, and network-level representation \cite{Yeoetal2011} toward dynamic connectivity \cite{Hutchisonetal2013,LeonardiVanDeVille2015,Pretietal2017}, multisite analysis \cite{DiMartinoetal2014}, reproducibility \cite{Abrahametal2017}, deep learning \cite{Heinsfeldetal2018,Eslamietal2019,AlmuqhimSaeed2021}, multi-atlas fusion \cite{Liuetal2024MADE}, dynamic graph modelling \cite{Tangetal2025GNNLSTM}, and multimodal graph learning \cite{Tangetal2026CASGNN}. Each stage addresses a limitation of the previous representation, but greater representational complexity also introduces additional sources of variation and overfitting.
+
+The second development concerns prediction reliability. Statistical comparison and confidence estimation are formalised in \cite{ClopperPearson1934,Demsar2006}, while harmonisation \cite{Johnsonetal2007,Fortinetal2018}, calibration \cite{Guoetal2017}, selective prediction \cite{GeifmanElYaniv2017}, explainability \cite{LundbergLee2017}, and decision-oriented evaluation \cite{VanCalsteretal2018} show that classification accuracy alone is insufficient for a screening-oriented system. Reliable probabilities, uncertainty-aware decisions, interpretable features, and performance on unseen acquisition sites are also required.
+
+Despite these advances, these directions are commonly investigated separately. Dynamic connectivity, multi-atlas information, harmonisation, interpretability, calibration, selective prediction, and cross-site generalisation are rarely evaluated within the same controlled pipeline. It also remains unclear whether increasingly complex classifiers provide greater benefit than carefully designed functional-connectivity representations when identical validation conditions are used.
+
+The present work is therefore designed around a controlled and reliability-oriented evaluation. Complementary functional-connectivity representations are compared under the same data partitions, tangent-space quantities are estimated from training data only, and cross-site performance is evaluated through leave-one-site-out validation. Structured low-rank connectivity patterns are used for interpretation, while calibrated probabilities and selective prediction are used to manage uncertainty. Each component is evaluated independently so that improvements can be attributed to the corresponding methodological choice rather than to model complexity alone.
+
+
+\bibliographystyle{cas-model2-names}
+\bibliography{cas-refs}
+\end{document}

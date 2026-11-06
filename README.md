@@ -7,35 +7,46 @@
 
 ---
 
-## Research direction (honest SOTA + genuine novelty)
+## Research direction
 
-**Goal:** honestly beat the ABIDE-I baseline (Heinsfeld 2018 = 70% acc) and push toward
-**80–85%** under a leakage-free protocol — *not* the inflated 90%+ numbers that come from
-feature-selection leakage or curated subsets.
+A **methods paper on ABIDE-I**, not a leaderboard entry. Every learned step — tangent
+reference, scaler, harmonisation, classifier, calibration — is fit inside the training
+fold, and results are reported for pooled 10-fold *and* leave-one-site-out.
 
-**Where we are (real, leakage-free nested CV):** tangent-space FC + ℓ2-logistic baseline
-= **AUROC 0.756 / acc 69.3% pooled 10-fold** (matches/beats Heinsfeld). The climb to
-80–85% is the multi-atlas SSL connectome-transformer ensemble (`train_sota.py`).
+**Where we are:** multi-atlas tangent-space FC + ℓ2-logistic + phenotype fusion =
+**AUROC 0.761 pooled / 0.757 LOSO**, with selective prediction reaching **0.805 accuracy
+at 50% coverage**. Rigorously evaluated work in the literature reaches ~0.79–0.81 AUROC,
+so there is real headroom; the 90%+ figures reported elsewhere are not reproducible
+without leakage, which Experiment 7 quantifies directly.
 
-**The paper's novelty is not new blocks — it's how we upgrade + validate them.** Three
-core contributions (details + required component upgrades in
-[publication_plan.md §2b](publication_plan.md)):
+**Target:** 0.79–0.82 AUROC / 0.73–0.77 accuracy. No claim above that range.
 
-- **C1 — Learned site-adversarial harmonization** inside the transformer (gradient-reversal
-  site-discriminator): site-invariant but diagnosis-preserving, end-to-end. *Provable
-  win:* shrinks the pooled↔LOSO gap — the field's open problem.
-- **C2 — Cross-atlas contrastive SSL + learned per-subject atlas fusion:** same subject
-  under different parcellations = a positive pair → an atlas-invariant representation
-  (beats naive soft-vote). *Strongest pure novelty.*
-- **C3 — Counterfactual connectome explanations:** the minimal connections whose change
-  flips ASD→TC, stable across folds and concordant with ASD circuitry → a biomarker paper.
+### Three methodological contributions
 
-*(Optional C4: ASD-subtype discovery.)* Every contribution is **earned by an ablation** —
-a module that fails its ablation is reported as an honest negative result, never forced.
+- **N1 — Riemannian dynamic-FC trajectories** (`dynamic_fc.py`). Each participant is a
+  trajectory on the SPD manifold, summarised by tangent-space **Fréchet mean**,
+  **dispersion** and **geodesic velocity**. Conventional dynamic-FC work slides a window
+  and clusters Euclidean correlations; this keeps the manifold geometry.
+- **N2 — Low-rank spectral tangent classifier** (`models/lowrank_spectral.py`). Writing
+  the decision as `f(S) = <W, S>` with `W = Σ λ_k u_k u_kᵀ` cuts parameters from 19,900
+  to ≈rP and makes each `u_k` an interpretable **eigen-connectome**. At r=50 it *matches*
+  the dense model with half the parameters — the claim is efficiency and interpretability
+  at equal accuracy, not an accuracy gain.
+- **N3 — Site-conditional conformal risk control** (`conformal_selective.py`). Abstention
+  with a finite-sample (Clopper–Pearson) bound on the error among answered cases, applied
+  marginally or **per site**. Verified: bound holds under both protocols; Mondrian mode
+  reaches 0.837 selective accuracy and correctly abstains on sites too small to certify.
 
-**Federated learning?** Not an accuracy lever here (ABIDE is already public; FL usually
-*hurts* accuracy on non-IID sites) — it belongs in Future Work as *federated domain
-generalization* pairing with C1, not as a core contribution.
+Each contribution is **earned by an ablation**. Modules that fail are reported as
+negative results — in-fold ComBat harmonisation is one such: it worsened AUROC and
+sensitivity and did not repair the weak sites, so it was **not adopted**.
+
+### Ablation suite
+
+Nine experiments (`run_ablations.py`, `leakage_audit.py`) emit **JSON + CSV** per
+condition into `results/<timestamp>_ablations/ablations/`, so figures never need a re-run:
+representation, classifier, rank sweep, atlas, fusion, harmonisation, **leakage audit**,
+protocol, and statistical tests. See [publication_plan.md](publication_plan.md).
 
 ---
 
@@ -445,8 +456,21 @@ Reference baseline on 871 subjects, everything fit in-fold (no leakage):
 | **ℓ2-logistic · tangent FC** | **pooled 10-fold** | **0.756 ± 0.048** | **69.3%** |
 | ℓ2-logistic · tangent FC | leave-one-site-out | 0.758 | 64.5% |
 
-Already matches/beats Heinsfeld 2018 (70%). The multi-atlas SSL connectome-transformer
-ensemble (`train_sota.py`) targeting 80–85% is the next result (see publication_plan.md).
+**Headline model** — multi-atlas (CC200+AAL+HO) tangent-linear + phenotype fusion,
+`train_sota.py`:
+
+| Model | Protocol | AUROC | Accuracy | Selective @50% |
+|---|---|---|---|---|
+| **Multi-atlas + phenotype** | pooled 10-fold | **0.761 ± 0.045** | 69.9% | **0.833 AUROC / 80.5% acc** |
+| Multi-atlas + phenotype | leave-one-site-out | **0.757 ± 0.109** | 65.8% | 0.817 AUROC / 78.9% acc |
+
+Calibration: ECE 0.102 pooled / 0.092 LOSO. Classifier comparison on identical features:
+linear **0.755** vs CatBoost 0.623, XGBoost 0.616, random forest 0.609 — the signal is
+low-rank (saturates at rank ≈50, participation ratio 12.5) and linear.
+
+Known limitations, reported rather than hidden: two sites fail under LOSO
+(MAX_MUN ≈0.51, OHSU ≈0.50); in-fold ComBat harmonisation did **not** help; external
+validation on ABIDE-II has not been run (no pre-extracted ROI release exists).
 
 > Note: an earlier 0.711 figure came from the pre-refactor pipeline, which contained
 > fabricated evaluation paths (since removed). All numbers here are from real inference.

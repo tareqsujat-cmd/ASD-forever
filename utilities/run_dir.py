@@ -77,14 +77,18 @@ def create_run_dir(results_root: str | Path, run_name: Optional[str] = None) -> 
 
     run_dir.mkdir(parents=True, exist_ok=False)
 
-    # convenience: results/latest -> most recent run
-    try:
-        link = results_root / "latest"
-        if link.is_symlink() or link.exists():
-            link.unlink()
-        link.symlink_to(run_dir.name)
-    except Exception:
-        pass
+    # convenience: results/latest -> most recent run.  Intermediate stages of a larger
+    # study are written to directories named ``tmp_*`` and are deleted once their
+    # artefacts have been copied out, so they do not claim the symlink: otherwise
+    # ``results/latest`` would point at a directory that is about to disappear.
+    if not str(run_name or "").startswith("tmp"):
+        try:
+            link = results_root / "latest"
+            if link.is_symlink() or link.exists():
+                link.unlink()
+            link.symlink_to(run_dir.name)
+        except Exception:
+            pass
     logger.info("Run directory: %s", run_dir.resolve())
     return run_dir
 

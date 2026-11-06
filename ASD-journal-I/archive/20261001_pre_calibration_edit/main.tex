@@ -1,0 +1,128 @@
+\documentclass[a4paper,fleqn]{cas-sc}
+\usepackage{soul}
+\newcommand{\reviewhl}[1]{\begingroup\sethlcolor{yellow}\hl{#1}\endgroup}
+\newcommand{\ding}[1]{\textcircled{\scriptsize\the\numexpr#1-201\relax}}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\graphicspath{{figures/}}
+\usepackage{booktabs}
+% hyperref is loaded by cas-sc.cls; loading it again with options clashes
+\hypersetup{colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue}
+
+\begin{document}
+\let\WriteBookmarks\relax
+\def\floatpagepagefraction{1}
+\def\textpagefraction{.001}
+
+\shorttitle{CLEAR-ASD}
+\shortauthors{R. U. Karim et al.}
+
+\title[mode=title]{CLEAR-ASD: Calibrated and Interpretable Autism Classification from Functional Connectomes}
+
+\author[1]{Reshad Ul Karim}
+\cormark[1]
+\ead{reshad.sazid@gmail.com}
+\credit{Conceptualization, Methodology, Software, Formal analysis, Writing -- original draft}
+
+\author[1]{Syeda Maliha Tabassum}
+\ead{syedamalihatabassum19@gmail.com}
+
+\author[1]{Tareq Sujat}
+\ead{tareq.sujat@g.bracu.ac.bd}
+
+\author[1]{Mehreen Mallick Fiona}
+\ead{mehreen.mallick.fiona@g.bracu.ac.bd}
+
+\author[1]{Rakin Bin Rabbani}
+\ead{rakin.rabbani@bracu.ac.bd}
+
+\author[2]{Aniqua Nusrat Zereen}
+\ead{aniqua.zer@mahidol.ac.th}
+
+% CRediT roles: fill in \credit{...} under each author before submission.
+% Author 1 is filled in; the remaining five are left for the authors to complete.
+
+\affiliation[1]{organization={Department of Computer Science and Engineering, BRAC University},
+            addressline={Kha 224 Bir Uttam Rafiqul Islam Avenue},
+            city={Dhaka},
+            postcode={1212},
+            country={Bangladesh}}
+
+\affiliation[2]{organization={Mahidol University},
+            country={Thailand}}
+
+\cortext[1]{Corresponding author}
+
+\begin{abstract}
+Autism spectrum disorder (ASD) classification from resting-state functional magnetic resonance imaging (rs-fMRI) remains difficult because functional-connectivity representations are high dimensional, multisite acquisition introduces substantial heterogeneity, and high average discrimination does not necessarily imply reliable confidence on individual predictions. A reliability-oriented connectome framework is therefore proposed using Autism Brain Imaging Data Exchange I (ABIDE-I) data. Functional connectivity is represented through regularized covariance matrices and tangent-space projection, while static and windowed connectivity descriptions are evaluated under leakage-controlled pooled and leave-one-site-out cross-validation. Predictions obtained from multiple connectivity descriptions are combined, and a regularized linear classifier is used so that whole-brain decision patterns remain directly interpretable. \reviewhl{Probability calibration is assessed and selective prediction is evaluated so that the consequences of withholding uncertain cases are quantified.} The methodology is designed to test whether improved reliability \reviewhl{is obtained} through representation, cross-site validation, \reviewhl{calibration assessment}, and compact connectome structure rather than through classifier complexity alone. The wider quality-control cohort reaches an area under the receiver operating characteristic curve of 0.79 and an accuracy of \reviewhl{0.71} for the fixed connectivity combination, while cross-site performance remains nearly unchanged. The framework is intended as a \reviewhl{research-evaluation} bioinformatics pipeline rather than a replacement for clinical diagnosis. \reviewhl{[AUTHORS TO RUN: To retain ``Calibrated'' in the title, estimate calibration-in-the-large, calibration slope, Brier score, and uncertainty intervals from genuinely held-out predictions; if recalibration is performed, fit it only within each outer-training partition and evaluate it on the corresponding held-out partition. Otherwise revise the title and calibration claims to ``calibration-assessed'' throughout.]}
+\end{abstract}
+
+\begin{graphicalabstract}
+\includegraphics[width=\linewidth]{fig_graphical_abstract}
+\end{graphicalabstract}
+
+\begin{highlights}
+\item Static and dynamic functional-connectivity descriptions are evaluated within one leakage-controlled framework.
+\item Cross-site generalization is tested through leave-one-site-out validation without relying on acquisition site as a predictor.
+\item \reviewhl{Calibration and selective prediction are assessed, including coverage under a stated error target.}
+\end{highlights}
+
+\begin{keywords}
+Autism spectrum disorder \sep Functional connectome \sep Resting-state fMRI \sep Bioinformatics \sep Calibration \sep Selective prediction
+\end{keywords}
+
+\maketitle
+
+\input{sections/introduction}
+\input{sections/related_work}
+\input{sections/method}
+\input{sections/result}
+\input{sections/discussion}
+\input{sections/conclusion}
+
+\section*{Data availability}
+This study analyses the Autism Brain Imaging Data Exchange I (ABIDE-I), which is publicly
+available through the ABIDE Preprocessed Initiative. The regional time series used here are the
+C-PAC \texttt{filt\_noglobal} derivatives distributed with that release, together with the
+accompanying phenotypic table. No new data were collected. Access is governed by the ABIDE
+data-use terms, and no participant-level data are redistributed with this article. The
+participant identifiers of the analysed cohorts, the fold assignments, and the derived result
+tables are provided so that every reported value can be traced to its source.
+
+\section*{Code availability}
+The analysis code, the configuration files, and the stored result tables that generate every
+table and figure in this article are available from the corresponding author on request and are
+being prepared for deposit in a public repository with an archived release, subject to the
+ABIDE data-use terms.
+
+\section*{Ethics approval and consent}
+This study is a secondary analysis of a de-identified, publicly available dataset. Ethical
+approval and informed consent were obtained by the contributing sites of the ABIDE-I
+consortium under their own institutional review boards, as described in the ABIDE-I data
+descriptor. No additional ethical approval was required for the present analysis, and the
+authors had no contact with participants.
+
+\section*{Funding}
+This research received no specific grant from any funding agency in the public, commercial, or
+not-for-profit sectors.
+
+\section*{Declaration of competing interest}
+The authors declare that they have no known competing financial interests or personal
+relationships that could have appeared to influence the work reported in this article.
+
+\section*{Acknowledgements}
+The authors thank the ABIDE-I consortium and the ABIDE Preprocessed Initiative for collecting,
+preprocessing, and openly sharing the data analysed here.
+
+\section*{Declaration of generative AI in the writing process}
+% Amend or delete this statement to match what was actually used.
+During the preparation of this work the authors used no generative artificial intelligence
+tools to create or alter any scientific content, figures, or results. The authors take full
+responsibility for the content of the publication.
+
+% Elsevier numbered style: references numbered in order of first appearance.
+% The "-names" variant keeps author names in the .bbl, which \citet needs.
+\bibliographystyle{elsarticle-num-names}
+\bibliography{references}
+\end{document}

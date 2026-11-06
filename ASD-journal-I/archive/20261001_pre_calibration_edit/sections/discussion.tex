@@ -1,0 +1,213 @@
+\section{Discussion}
+\label{sec:discussion}
+
+This study examines what connectivity-based classification of autism measures on ABIDE-I,
+and which analysis choices determine its reported performance. To this end, a single
+pipeline is used in which every learned quantity is fitted within the training partition.
+Under this protocol, six findings are obtained. First, \reviewhl{discrimination varies across cognitive-ability subgroups in this cohort}. Second, somatomotor hypoconnectivity in autism strengthens,
+rather than weakens, when head motion is matched within site. Third, feature selection before
+the data are split inflates discrimination at the level of connections but not of regions.
+Fourth, linear classifiers outperform fixed-configuration tree ensembles on identical
+tangent-space features. Fifth, classifier scores are not associated with the degree of autism
+within the autistic group. Sixth, the advantage of windowed connectivity is explained by the
+covariance shrinkage that this description applies.
+
+These findings matter for the interpretation of connectivity-based autism research. Because
+\reviewhl{discrimination varies across cognitive-ability subgroups}, an accuracy reported on ABIDE-I partly reflects the
+cognitive composition of the autistic sample. Benchmarks obtained on differently composed
+samples are, therefore, not directly comparable. In addition, the somatomotor difference is
+not explained by the recorded head motion, because it strengthens once motion is matched.
+\reviewhl{This persistence under matching on recorded mean FD is preliminary and does not establish a biomarker.} Moreover, the
+feature-selection result shows that reported accuracies \reviewhl{are interpreted together with} the
+procedure that produced them. In addition, simple linear models remain a strong default for
+high-dimensional connectivity features. The symptom result, in turn, shows that a score which
+separates the diagnostic groups does not thereby measure the degree of autism. Finally, the
+shrinkage control shows that an apparent gain from temporal information \reviewhl{is potentially produced} by
+regularisation alone.
+
+\subsection{Interpretation of the results}
+\label{subsec:discussion-results}
+
+Discrimination is maintained when a whole acquisition site is withheld from training. The
+primary ensemble reaches a participant-pooled AUROC of 0.776 under pooled ten-fold validation
+and 0.774 under leave-one-site-out validation (Table~\ref{tab:performance}). Because the
+two values are almost identical, the model does not rely on knowledge of the acquisition
+site. In addition, a random-effects mean AUROC of 0.803 is obtained across the 20 sites. The
+\reviewhl{corresponding descriptive interval} extends from 0.725 to 0.882. \reviewhl{Because the site estimates share overlapping training data, this is not treated as a validated prediction interval for a new centre.} However, site-level AUROC ranges from 0.589 to 0.912, and the intervals of five sites
+include 0.5. This spread is expected for sites of about thirty participants, so it is not
+read as site-dependent failure.
+
+Accuracy at the published level is reached without any step fitted before the data are
+split. Specifically, a participant-pooled accuracy of 0.706 (95\% Wilson interval
+0.678--0.733) is obtained in the 1,032-participant cohort. In comparison, accuracies of
+0.700, 0.703, and 0.708 are reported by \citet{Heinsfeldetal2018}, \citet{Eslamietal2019},
+and \citet{AlmuqhimSaeed2021}. Because these values lie within one interval of each other,
+the comparison indicates parity rather than superiority.
+
+The dependence of detection on cognitive ability is the first finding that concerns autism
+itself. Against one fixed group of 468 non-autistic participants, AUROC falls from 0.873
+below full-scale IQ 85 to 0.719 at 115 or above. Within the autistic group, classifier scores
+also decline with full-scale IQ ($\rho=-0.18$, $p=0.0004$). In contrast, no such association
+is found within the non-autistic group ($\rho=0.05$, $p=0.32$). The within-group association
+is the more direct evidence, because it involves no comparison between the diagnostic
+groups. When the groups are matched on IQ, however, discrimination remains highest in the
+lowest quartile but no longer declines across the upper three. Part of the band gradient,
+therefore, reflects the IQ difference between the groups. Nevertheless, an association
+between classifier scores and verbal IQ has also been reported in ABIDE data
+\citep{Nielsenetal2013}. \reviewhl{These exploratory results motivate direct interaction testing and independent validation before any IQ-specific reliability claim.}
+
+The somatomotor finding shows why motion control changes the interpretation of group
+differences. Head motion is known to alter measured functional connectivity
+\citep{Poweretal2012}. In this pipeline, mean framewise displacement is positively
+associated with mean connection strength ($\rho=0.51$ across participants and $0.45$ within
+site). Because autistic participants move more, residual motion would, on average, raise
+their connectivity, which is opposite to the observed reduction. Consistent with this
+reasoning, the number of system pairs with reduced connectivity rises from 10 to 26 of 36 in
+256 within-site pairs matched for motion. Similarly, the mean effect of the 21 somatomotor
+regions strengthens from $-0.215$ in all 863 participants to $-0.249$ in 280 matched pairs.
+Moreover, all 21 regions remain significant under this matching, and every one of them
+strengthens. The direction agrees with
+the somatomotor involvement reported by \citet{Chenetal2015} and with the reductions reported
+by \citet{Holigaetal2019} and \citet{Ilioskaetal2023}. These studies, however, drew on
+samples that include ABIDE data, so the agreement is not an independent replication.
+
+The feature-selection result shows how reported accuracies \reviewhl{differ widely} under
+apparently similar pipelines. When 2,000 of 19,900 connections are selected with all labels
+before the split, fold-mean AUROC is raised from 0.756 to 0.987 on identical folds. In
+addition, accuracy is raised from 0.692 to 0.948. In contrast, selecting 10 to 100 of 196
+regions with all labels changes AUROC by only about 0.006 on average. The inflation,
+therefore, depends on the granularity of the features. This dependence is plausible, because
+selection among many candidate connections \reviewhl{risks exploiting} chance associations with the labels
+of held-out participants. The two comparisons, however, also differ in cohort, shrinkage, and
+ranking statistic, so they contrast two levels rather than establish a trend. For this
+reason, a study that selects connections before cross-validation \reviewhl{risks reporting} inflated
+estimates, and its procedure \reviewhl{is reported together with its accuracy}.
+
+The classifier comparison indicates that linear models suit high-dimensional connectivity
+features. On identical features and folds, the five linear classifiers reach
+participant-pooled AUROCs of 0.735--0.757. In contrast, the three tree ensembles reach
+0.611--0.624 (unadjusted DeLong $p\le2.4\times10^{-12}$ for the logistic model against each
+ensemble). This pattern is consistent with the benchmark of \citet{Dadietal2019}, in which
+tangent-space connectivity performs well with regularised linear classifiers. However, the
+tree ensembles use fixed configurations, so the gap characterises these configurations
+rather than the best attainable tree model.
+
+The symptom analysis shows what the classifier score does not measure. Across both diagnostic
+groups, 3 of 6 associations between the score and symptom severity survive correction,
+whereas 0 of 6 survive within the autistic group. For the SRS total, for example, the
+correlation is 0.438 across both groups but 0.050 within the autistic group. This contrast is
+expected, because few non-autistic participants complete these instruments, and those who do
+score at the low end of the scale. Any model that separates the groups therefore produces a
+correlation across both groups largely by construction. The score is, for this reason, read
+as a group-separating measurement rather than as an index of the degree of autism. This
+distinction matters, because such correlations are often presented as evidence that a model
+captures a graded phenotype.
+
+The shrinkage control shows that an apparent advantage of windowed connectivity need not
+arise from temporal information. An additional covariance shrinkage of 0.15 is applied by the
+windowed description to its window covariances, whereas no such shrinkage is received by the
+whole-scan description. When the same shrinkage is applied to the whole-scan estimate, its
+AUROC is raised by 0.013 (unadjusted DeLong $p=0.004$). The windowed description then differs
+from this matched baseline by $-0.002$ ($p=0.709$), against 0.010 ($p=0.281$) from the
+unshrunk baseline. The small advantage is, therefore, attributed to the regularisation rather
+than to variation within the scan. Comparisons between dynamic and static connectivity \reviewhl{accordingly require matched regularisation} of both descriptions.
+
+Several secondary results bound what these data support. The ensemble probabilities have \reviewhl{low ten-bin expected calibration error}, with an expected calibration error of 0.046 under pooled ten-fold validation and
+0.040 under leave-one-site-out validation. \reviewhl{This metric alone does not establish calibrated probabilities.} Selective prediction, however, does not provide a useful
+guarantee on the answered cases. Specifically, the per-site abstention rule meets its target
+but answers only 170 of 871 participants (19.5\%), and 143 of them are at a single site.
+Finally, the attainable accuracy against these labels lies between approximately
+0.85 and 0.99. However, this ceiling cannot be fixed from two instruments applied to one
+population.
+
+\subsection{Limitations}
+\label{subsec:limitations}
+
+The conclusions are limited by the composition of the cohort. Participants range from 6.5 to
+58 years, with a median of 14.8 years, so the results do not bear on early identification.
+In addition, the primary cohort contains 727 male and 144 female participants. Moreover, the
+comparison group is typically developing rather than clinically referred, and every label is
+a diagnosis obtained before the scan. The results, therefore, describe discrimination within
+an aggregated research cohort rather than performance in a differential-diagnostic setting.
+
+The evaluation is also limited to one dataset. Leave-one-site-out validation estimates
+transfer among the acquisition sites represented in ABIDE-I. It does not, however, estimate
+transfer to independent datasets, scanners, or preprocessing pipelines. For this reason,
+external validation on an independent cohort is still required before any clinical use is
+considered.
+
+The group-difference analyses depend on the preprocessing and on their exploratory design.
+All results are obtained with one preprocessing strategy without global signal regression,
+one parcellation, and one nuisance model. The direction of the group differences is,
+therefore, conditional on these choices. In addition, the group differences are univariate
+contrasts computed without reference to the classifier. They describe how the groups differ,
+but not which measurements the classifier uses. Moreover, the motion-matched and regional
+analyses are exploratory, and the regional analysis is defined after inspection of the
+system-level results.
+
+Several design choices further limit the comparisons. Only the logistic model is tuned, so
+the tree ensembles are represented by fixed configurations. In addition, the pairwise
+$p$-values are unadjusted and are interpreted descriptively. Several approaches, moreover,
+are evaluated but not adopted. Site harmonisation shows no evidence of benefit, within-scan
+variability lowers accuracy, and three atlases perform no better than one. Similarly,
+demographic variables add about 0.004 AUROC, and restriction to the most discriminating
+regions lowers performance at every list length. These negative results are reported because
+each of them bounds what a subsequent study on this public dataset \reviewhl{expects}.
+
+\subsection{Additional analyses and remaining requirements}
+\label{subsec:required-validation}
+
+Four additional analyses bear on how the reported uncertainty and the cognitive-ability claim
+should be read. Uncertainty is re-estimated with a site-clustered bootstrap, and the resulting
+intervals are wider than the DeLong and Wilson intervals, particularly at the lower bound
+(Section~\ref{subsec:results-performance}). The parametric intervals are therefore treated as
+lower bounds on uncertainty rather than as complete accounts of it. Discrimination itself is not
+placed in question, because no interval includes 0.5. Calibration is likewise assessed beyond the
+binned error, and the probabilities are found to be correctly dispersed but slightly high on
+average, while the binned error is shown to depend on the number of bins
+(Section~\ref{subsec:results-secondary}). The expected calibration error alone would therefore
+have overstated how well the probabilities are calibrated.
+
+The dependence of detection on cognitive ability is also tested directly rather than inferred from
+two separate within-group correlations. The interaction between diagnosis and cognitive ability is
+negative under both protocols and survives correction across the IQ family for full-scale and
+verbal IQ, but not for performance IQ (Section~\ref{subsec:results-cognitive-ability}). The claim
+is accordingly stated for full-scale and verbal IQ, and it is not extended to performance IQ. The
+analysed cohorts are additionally reconciled against the released records, so that every count in
+the paper traces to an explicit inclusion rule.
+
+Four requirements nevertheless remain open, and the claims of this study are bounded accordingly.
+Preprocessing is not repeated within every inner cross-validation split, and the tangent reference
+and feature scaler are fitted once on each outer-training partition rather than within each inner
+split, so the nested design is complete at the outer level only. The training-fold region-selection
+condition still uses a nuisance model fitted to the complete analysis cohort, so it is not a
+strictly nested comparator. The permutation tests assume exchangeability under a site-stratified
+null without residualising on the covariates that differ by diagnosis, and a residual-permutation
+procedure such as Freedman--Lane has not yet been substituted. Finally, the pipeline has not been
+validated on an independent cohort. For this reason the study is presented throughout as a
+retrospective analysis of an aggregated research cohort, and no claim is made about clinical
+screening, deployment, or performance at a new acquisition site.
+
+\subsection{Future work}
+\label{subsec:future-work}
+
+Several extensions follow directly from these findings. The most direct extension is
+external validation on an independent cohort, such as ABIDE-II. Because the available
+ABIDE-II derivatives are produced by a different preprocessing pipeline, such a test requires
+either the same preprocessing or an explicit analysis of transfer across pipelines.
+
+The dependence of detection on cognitive ability also motivates further study. In particular,
+future studies \reviewhl{could evaluate detection} in samples that are balanced for cognitive ability. In addition,
+the dependence \reviewhl{could be tested} in cohorts with more cognitively able autistic participants,
+more female participants, and younger children. Clinically referred comparison groups would,
+moreover, move the evaluation closer to a differential-diagnostic setting.
+
+The somatomotor difference \reviewhl{could, in turn, be tested} under alternative denoising strategies.
+These strategies include global signal regression and finer measures of head motion. In
+addition, tuned tree ensembles and other nonlinear models \reviewhl{could be compared} under the same
+nested protocol, so that the classifier comparison extends beyond fixed configurations.
+
+Finally, the feature-selection result suggests a reporting standard for connectivity-based
+classification studies. Under this standard, every step fitted to data is placed inside the
+cross-validation loop and is declared together with the reported performance. Such reporting
+would allow published accuracies on ABIDE-I to be compared on an equal footing.

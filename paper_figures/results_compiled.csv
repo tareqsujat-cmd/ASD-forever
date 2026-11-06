@@ -1,0 +1,110 @@
+category,section,finding,quantity,value,ci_low,ci_high,n,protocol,comparator,statistic,p_value,source
+main,1. Performance and transfer,"Primary ensemble (probability mean), strict cohort",auroc,0.776,0.7454,0.8066,871.0,pooled 10-fold,,DeLong,,tables/intervals.csv
+main,1. Performance and transfer,"Primary ensemble (probability mean), strict cohort",accuracy,0.7072,0.6762,0.7365,871.0,pooled 10-fold,,Wilson,,tables/intervals.csv
+main,1. Performance and transfer,"Primary ensemble (probability mean), strict cohort",sensitivity,0.7047,0.6584,0.7472,871.0,pooled 10-fold,,Wilson,,tables/intervals.csv
+main,1. Performance and transfer,"Primary ensemble (probability mean), strict cohort",specificity,0.7094,0.6667,0.7487,871.0,pooled 10-fold,,Wilson,,tables/intervals.csv
+main,1. Performance and transfer,"Primary ensemble (probability mean), strict cohort",auroc,0.7745,0.7438,0.8052,871.0,leave-one-site-out,,DeLong,,tables/intervals.csv
+main,1. Performance and transfer,"Primary ensemble (probability mean), strict cohort",accuracy,0.7107,0.6797,0.7398,871.0,leave-one-site-out,,Wilson,,tables/intervals.csv
+main,1. Performance and transfer,"Primary ensemble (probability mean), strict cohort",sensitivity,0.7419,0.6971,0.7822,871.0,leave-one-site-out,,Wilson,,tables/intervals.csv
+main,1. Performance and transfer,"Primary ensemble (probability mean), strict cohort",specificity,0.6838,0.6403,0.7242,871.0,leave-one-site-out,,Wilson,,tables/intervals.csv
+main,1. Performance and transfer,"Primary ensemble, wider quality-control cohort (comparability only)",auroc,0.789,0.7619,0.8161,1032.0,pooled 10-fold,,DeLong,,raw/voting_func.json
+main,1. Performance and transfer,"Primary ensemble, wider quality-control cohort (comparability only)",accuracy,0.7064,0.6779,0.7334,1032.0,pooled 10-fold,,Wilson,,raw/voting_func.json
+main,1. Performance and transfer,"Primary ensemble, wider quality-control cohort (comparability only)",auroc,0.7829,0.7552,0.8106,1032.0,leave-one-site-out,,DeLong,,raw/voting_func.json
+main,1. Performance and transfer,"Primary ensemble, wider quality-control cohort (comparability only)",accuracy,0.7103,0.6819,0.7371,1032.0,leave-one-site-out,,Wilson,,raw/voting_func.json
+main,1. Performance and transfer,Per-site random-effects combination,AUROC,0.8034,,,871.0,leave-one-site-out,,DerSimonian-Laird,,raw/intervals.json
+main,1. Performance and transfer,Prediction interval for a site not yet seen,AUROC,,0.725,0.8819,20.0,leave-one-site-out,,"I2 = 19%, Q = 23.5 on 19 df",0.2163,raw/intervals.json
+main,1. Performance and transfer,Per-site range,AUROC median,0.7964,0.5893,0.9121,871.0,leave-one-site-out,"lowest SBL, highest UM_2",,,tables/per_site_intervals.csv
+main,2. Calibration and guarantee,Calibration of reported probabilities,expected calibration error,0.0464,,,871.0,pooled 10-fold,,,,selective_ensemble/selective_report.json
+main,2. Calibration and guarantee,Calibration of reported probabilities,expected calibration error,0.0401,,,871.0,leave-one-site-out,,,,selective_ensemble/selective_report.json
+main,2. Calibration and guarantee,One threshold for the whole cohort,cases answered,0.0,,,871.0,leave-one-site-out,target alpha = 0.25,,,raw/conformal_ensemble.json
+main,2. Calibration and guarantee,One threshold for the whole cohort,splits meeting target (honest split evaluation),0.8158,,,38.0,leave-one-site-out,nominal 0.90,,,raw/conformal_ensemble.json
+main,2. Calibration and guarantee,A threshold per site,cases answered,0.1952,,,871.0,leave-one-site-out,target alpha = 0.25,,,raw/conformal_ensemble.json
+main,2. Calibration and guarantee,A threshold per site,splits meeting target (honest split evaluation),0.9137,,,197.0,leave-one-site-out,nominal 0.90,,,raw/conformal_ensemble.json
+main,3. Severity is a pooling artefact,"ADOS total, computed pooled",Spearman rho,0.2066,,,301.0,pooled 10-fold,,Spearman,0.0003087927653427,tables/severity_pooled_vs_within.csv
+main,3. Severity is a pooling artefact,"ADOS total, computed within-autism",Spearman rho,0.1152,,,282.0,pooled 10-fold,,Spearman,0.0533638818806335,tables/severity_pooled_vs_within.csv
+main,3. Severity is a pooling artefact,"ADOS calibrated severity, computed pooled",Spearman rho,0.1958,,,203.0,pooled 10-fold,,Spearman,0.0051244958082919,tables/severity_pooled_vs_within.csv
+main,3. Severity is a pooling artefact,"ADOS calibrated severity, computed within-autism",Spearman rho,0.1282,,,193.0,pooled 10-fold,,Spearman,0.0755009601484772,tables/severity_pooled_vs_within.csv
+main,3. Severity is a pooling artefact,"ADI-R social, computed pooled",Spearman rho,-0.0511,,,276.0,pooled 10-fold,,Spearman,0.397974395121892,tables/severity_pooled_vs_within.csv
+main,3. Severity is a pooling artefact,"ADI-R social, computed within-autism",Spearman rho,-0.0511,,,276.0,pooled 10-fold,,Spearman,0.397974395121892,tables/severity_pooled_vs_within.csv
+main,3. Severity is a pooling artefact,"ADI-R communication, computed pooled",Spearman rho,-0.0579,,,277.0,pooled 10-fold,,Spearman,0.3371421332272877,tables/severity_pooled_vs_within.csv
+main,3. Severity is a pooling artefact,"ADI-R communication, computed within-autism",Spearman rho,-0.0579,,,277.0,pooled 10-fold,,Spearman,0.3371421332272877,tables/severity_pooled_vs_within.csv
+main,3. Severity is a pooling artefact,"ADI-R repetitive behaviour, computed pooled",Spearman rho,0.0773,,,277.0,pooled 10-fold,,Spearman,0.1998845363019243,tables/severity_pooled_vs_within.csv
+main,3. Severity is a pooling artefact,"ADI-R repetitive behaviour, computed within-autism",Spearman rho,0.0773,,,277.0,pooled 10-fold,,Spearman,0.1998845363019243,tables/severity_pooled_vs_within.csv
+main,3. Severity is a pooling artefact,"SRS total, computed pooled",Spearman rho,0.4376,,,300.0,pooled 10-fold,,Spearman,1.838513941003269e-15,tables/severity_pooled_vs_within.csv
+main,3. Severity is a pooling artefact,"SRS total, computed within-autism",Spearman rho,0.0505,,,163.0,pooled 10-fold,,Spearman,0.5223717513441619,tables/severity_pooled_vs_within.csv
+main,3. Severity is a pooling artefact,"ADOS total, computed pooled",Spearman rho,0.2312,,,301.0,leave-one-site-out,,Spearman,5.114182565253691e-05,tables/severity_pooled_vs_within.csv
+main,3. Severity is a pooling artefact,"ADOS total, computed within-autism",Spearman rho,0.1141,,,282.0,leave-one-site-out,,Spearman,0.0555757802009675,tables/severity_pooled_vs_within.csv
+main,3. Severity is a pooling artefact,"ADOS calibrated severity, computed pooled",Spearman rho,0.2286,,,203.0,leave-one-site-out,,Spearman,0.0010347964222515,tables/severity_pooled_vs_within.csv
+main,3. Severity is a pooling artefact,"ADOS calibrated severity, computed within-autism",Spearman rho,0.1437,,,193.0,leave-one-site-out,,Spearman,0.0461548489058455,tables/severity_pooled_vs_within.csv
+main,3. Severity is a pooling artefact,"ADI-R social, computed pooled",Spearman rho,-0.0212,,,276.0,leave-one-site-out,,Spearman,0.7252971955343676,tables/severity_pooled_vs_within.csv
+main,3. Severity is a pooling artefact,"ADI-R social, computed within-autism",Spearman rho,-0.0212,,,276.0,leave-one-site-out,,Spearman,0.7252971955343676,tables/severity_pooled_vs_within.csv
+main,3. Severity is a pooling artefact,"ADI-R communication, computed pooled",Spearman rho,-0.0239,,,277.0,leave-one-site-out,,Spearman,0.692152965560305,tables/severity_pooled_vs_within.csv
+main,3. Severity is a pooling artefact,"ADI-R communication, computed within-autism",Spearman rho,-0.0239,,,277.0,leave-one-site-out,,Spearman,0.692152965560305,tables/severity_pooled_vs_within.csv
+main,3. Severity is a pooling artefact,"ADI-R repetitive behaviour, computed pooled",Spearman rho,0.0728,,,277.0,leave-one-site-out,,Spearman,0.2271882494854015,tables/severity_pooled_vs_within.csv
+main,3. Severity is a pooling artefact,"ADI-R repetitive behaviour, computed within-autism",Spearman rho,0.0728,,,277.0,leave-one-site-out,,Spearman,0.2271882494854015,tables/severity_pooled_vs_within.csv
+main,3. Severity is a pooling artefact,"SRS total, computed pooled",Spearman rho,0.4586,,,300.0,leave-one-site-out,,Spearman,5.238880514535984e-17,tables/severity_pooled_vs_within.csv
+main,3. Severity is a pooling artefact,"SRS total, computed within-autism",Spearman rho,0.0711,,,163.0,leave-one-site-out,,Spearman,0.3671977183532446,tables/severity_pooled_vs_within.csv
+main,4. Windowed advantage is shrinkage,"shrinkage alone, on the static representation",AUROC difference,0.0127,,,871.0,pooled 10-fold,static r=0.15 vs static r=0.00,DeLong,0.0036368949694025,tables/ridge_sweep_tests.csv
+main,4. Windowed advantage is shrinkage,the windowed representation against an unshrunk static baseline,AUROC difference,0.0102,,,871.0,pooled 10-fold,dynamic: mean (r=0.15) vs static r=0.00,DeLong,0.281119630572887,tables/ridge_sweep_tests.csv
+main,4. Windowed advantage is shrinkage,the windowed representation against a matched static baseline,AUROC difference,-0.0025,,,871.0,pooled 10-fold,dynamic: mean (r=0.15) vs static r=0.15,DeLong,0.7092196116720928,tables/ridge_sweep_tests.csv
+main,4. Windowed advantage is shrinkage,Shrinkage selected by nested cross-validation,AUROC difference,0.0142,,,871.0,pooled 10-fold,no second shrinkage,DeLong,0.0721899220916582,tables/ridge_nested.csv
+main,4. Windowed advantage is shrinkage,Shrinkage selected by nested cross-validation,AUROC difference,0.0132,,,871.0,leave-one-site-out,no second shrinkage,DeLong,0.0983451354446182,tables/ridge_nested.csv
+main,5. Leakage depends on granularity,"Selecting 2,000 connections of 19,900 outside the split",AUROC,0.9867,,,871.0,pooled 10-fold,honest 0.7556,inflation +0.2311,,tables/leakage_audit.csv
+main,5. Leakage depends on granularity,Selecting 10 regions of 196 outside the split,AUROC difference,0.0009,,,871.0,pooled 10-fold,same selection made in-fold,,,tables/region_selection_tests.csv
+main,5. Leakage depends on granularity,Selecting 20 regions of 196 outside the split,AUROC difference,0.0039,,,871.0,pooled 10-fold,same selection made in-fold,,,tables/region_selection_tests.csv
+main,5. Leakage depends on granularity,Selecting 30 regions of 196 outside the split,AUROC difference,-0.0035,,,871.0,pooled 10-fold,same selection made in-fold,,,tables/region_selection_tests.csv
+main,5. Leakage depends on granularity,Selecting 50 regions of 196 outside the split,AUROC difference,-0.0096,,,871.0,pooled 10-fold,same selection made in-fold,,,tables/region_selection_tests.csv
+main,5. Leakage depends on granularity,Selecting 100 regions of 196 outside the split,AUROC difference,0.0121,,,871.0,pooled 10-fold,same selection made in-fold,,,tables/region_selection_tests.csv
+main,6. Group differences between systems,"System pairs differing after correction, all participants",pairs significant,10.0,,,,,of 36 pairs,,,tables/network_contrast.csv
+main,6. Group differences between systems,"Somatomotor within-system difference, all participants",standardised difference,-0.2155,,,,,,z = -4.77,0.0001999600079984,tables/network_contrast.csv
+main,6. Group differences between systems,"System pairs differing after correction, motion-matched pairs",pairs significant,26.0,,,,,of 36 pairs,,,tables/network_contrast_motion_matched.csv
+main,6. Group differences between systems,"Somatomotor within-system difference, motion-matched pairs",standardised difference,-0.2925,,,,,,z = -4.89,0.0001999600079984,tables/network_contrast_motion_matched.csv
+supporting,S6. Inside the somatomotor system,"Somatomotor regions significant, all participants",regions significant,21.0,,,,,of 21 regions,mean effect -0.2155,,tables/sensorimotor_regions.csv
+supporting,S6. Inside the somatomotor system,"Somatomotor regions significant, motion-matched pairs",regions significant,21.0,,,,,of 21 regions,mean effect -0.2489,,tables/sensorimotor_regions_matched.csv
+supporting,S6. Inside the somatomotor system,Split-half reproducibility of the regional ordering,Spearman rho,0.546,,,863.0,,"random 100 equal-sized blocks, median 0.350",9% of random blocks reach it,,raw/sensorimotor_regions.json
+main,7. The label ceiling,Disagreement between the two instruments,proportion disagreeing,0.1502,,,213.0,,,,,raw/label_ceiling.json
+main,7. The label ceiling,Accuracy attainable against these labels,accuracy,,0.848,0.992,213.0,,,reported as a range; two-rater model unidentified (Hui & Walter 1980),,raw/label_ceiling.json
+supporting,S3. Classifier family,Linear model against random forest,AUROC difference,0.1461,,,871.0,pooled 10-fold,0.7569 vs 0.6107,DeLong,1.506932325159075e-13,tables/statistics.csv
+supporting,S3. Classifier family,Linear model against XGBoost,AUROC difference,0.1396,,,871.0,pooled 10-fold,0.7569 vs 0.6173,DeLong,6.31295055267851e-15,tables/statistics.csv
+supporting,S3. Classifier family,Linear model against CatBoost,AUROC difference,0.1327,,,871.0,pooled 10-fold,0.7569 vs 0.6242,DeLong,2.360140228121923e-12,tables/statistics.csv
+supporting,S2. Representation,"Shrinkage the Ledoit-Wolf rule selects, against 0.20-0.50 chosen by the classification objective",median intensity,0.0496,0.016,0.149,863.0,,,"Spearman(volumes, intensity) = -0.67; 443 of 863 scans shorter than the number of regions",,raw/shrinkage_profile.json
+supporting,Where the model works less well,"FIQ (site-centred), Q1",AUROC,0.8332,0.7713,0.8951,204.0,pooled 10-fold,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"FIQ (site-centred), Q2",AUROC,0.7939,0.7313,0.8565,203.0,pooled 10-fold,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"FIQ (site-centred), Q3",AUROC,0.7461,0.6754,0.8168,201.0,pooled 10-fold,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"FIQ (site-centred), Q4",AUROC,0.7092,0.6373,0.7811,203.0,pooled 10-fold,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"FIQ band, autistic side only (controls held fixed), FIQ < 85",AUROC,0.8729,0.8177,0.928,40.0,pooled 10-fold,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"FIQ band, autistic side only (controls held fixed), FIQ 85-99",AUROC,0.8152,0.7674,0.8629,97.0,pooled 10-fold,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"FIQ band, autistic side only (controls held fixed), FIQ 100-114",AUROC,0.7808,0.7363,0.8254,126.0,pooled 10-fold,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"FIQ band, autistic side only (controls held fixed), FIQ >= 115",AUROC,0.719,0.668,0.7699,113.0,pooled 10-fold,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"score vs FIQ, residualised on site/age/motion, autistic",Spearman rho,-0.1801,,,376.0,pooled 10-fold,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"score vs FIQ, residualised on site/age/motion, control",Spearman rho,0.0477,,,435.0,pooled 10-fold,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"score vs VIQ, residualised on site/age/motion, autistic",Spearman rho,-0.1824,,,342.0,pooled 10-fold,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"score vs VIQ, residualised on site/age/motion, control",Spearman rho,0.0385,,,379.0,pooled 10-fold,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"score vs PIQ, residualised on site/age/motion, autistic",Spearman rho,-0.1521,,,344.0,pooled 10-fold,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"score vs PIQ, residualised on site/age/motion, control",Spearman rho,0.0073,,,391.0,pooled 10-fold,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"FIQ (site-centred, IQ-matched pairs), Q1",AUROC,0.8548,0.7878,0.9218,137.0,pooled 10-fold,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"FIQ (site-centred, IQ-matched pairs), Q2",AUROC,0.6998,0.6106,0.789,137.0,pooled 10-fold,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"FIQ (site-centred, IQ-matched pairs), Q3",AUROC,0.7515,0.6697,0.8333,138.0,pooled 10-fold,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"FIQ (site-centred, IQ-matched pairs), Q4",AUROC,0.7561,0.675,0.8371,136.0,pooled 10-fold,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"sex, female",AUROC,0.8274,0.7598,0.8949,144.0,pooled 10-fold,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"sex, male",AUROC,0.7642,0.73,0.7985,727.0,pooled 10-fold,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"FIQ (site-centred), Q1",AUROC,0.8254,0.7629,0.888,204.0,leave-one-site-out,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"FIQ (site-centred), Q2",AUROC,0.7934,0.7299,0.8569,203.0,leave-one-site-out,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"FIQ (site-centred), Q3",AUROC,0.7445,0.6745,0.8145,201.0,leave-one-site-out,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"FIQ (site-centred), Q4",AUROC,0.7047,0.6326,0.7768,203.0,leave-one-site-out,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"FIQ band, autistic side only (controls held fixed), FIQ < 85",AUROC,0.8713,0.8164,0.9262,40.0,leave-one-site-out,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"FIQ band, autistic side only (controls held fixed), FIQ 85-99",AUROC,0.8162,0.7686,0.8638,97.0,leave-one-site-out,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"FIQ band, autistic side only (controls held fixed), FIQ 100-114",AUROC,0.7875,0.7441,0.831,126.0,leave-one-site-out,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"FIQ band, autistic side only (controls held fixed), FIQ >= 115",AUROC,0.7092,0.6573,0.761,113.0,leave-one-site-out,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"score vs FIQ, residualised on site/age/motion, autistic",Spearman rho,-0.1787,,,376.0,leave-one-site-out,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"score vs FIQ, residualised on site/age/motion, control",Spearman rho,0.022,,,435.0,leave-one-site-out,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"score vs VIQ, residualised on site/age/motion, autistic",Spearman rho,-0.1893,,,342.0,leave-one-site-out,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"score vs VIQ, residualised on site/age/motion, control",Spearman rho,0.0007,,,379.0,leave-one-site-out,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"score vs PIQ, residualised on site/age/motion, autistic",Spearman rho,-0.1473,,,344.0,leave-one-site-out,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"score vs PIQ, residualised on site/age/motion, control",Spearman rho,-0.0046,,,391.0,leave-one-site-out,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"FIQ (site-centred, IQ-matched pairs), Q1",AUROC,0.8479,0.7812,0.9146,144.0,leave-one-site-out,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"FIQ (site-centred, IQ-matched pairs), Q2",AUROC,0.7346,0.6485,0.8207,132.0,leave-one-site-out,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"FIQ (site-centred, IQ-matched pairs), Q3",AUROC,0.7368,0.6522,0.8214,137.0,leave-one-site-out,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"FIQ (site-centred, IQ-matched pairs), Q4",AUROC,0.7557,0.6761,0.8352,137.0,leave-one-site-out,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"sex, female",AUROC,0.8062,0.7347,0.8776,144.0,leave-one-site-out,,,,tables/subgroup_auroc.csv
+supporting,Where the model works less well,"sex, male",AUROC,0.7672,0.733,0.8013,727.0,leave-one-site-out,,,,tables/subgroup_auroc.csv

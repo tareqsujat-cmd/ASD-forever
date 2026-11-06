@@ -144,107 +144,13 @@ def load_phenotype(processed_dir, sids):
     return np.stack(feats)
 
 
-def _pretrain_ssl(fc_tr, n_rois, d_model, epochs, device, seed, batch_size=32, lr=3e-4):
-    import torch
-    from models.connectome_transformer import MaskedConnectomeAutoencoder
-    torch.manual_seed(seed)
-    ae = MaskedConnectomeAutoencoder(n_rois=n_rois, d_model=d_model,
-                                     n_heads=4, n_layers=2, mask_ratio=0.25).to(device)
-    opt = torch.optim.AdamW(ae.parameters(), lr=lr, weight_decay=1e-5)
-    X = torch.tensor(fc_tr, dtype=torch.float32)
-    n = len(X)
-    for ep in range(epochs):
-        ae.train()
-        perm = torch.randperm(n)
-        tot = 0.0
-        for i in range(0, n, batch_size):
-            xb = X[perm[i:i + batch_size]].to(device)
-            opt.zero_grad()
-            _, loss = ae(xb)
-            loss.backward(); opt.step()
-            tot += float(loss) * len(xb)
-        if (ep + 1) % max(1, epochs // 4) == 0:
-            logger.info("    SSL epoch %3d/%d  recon_mse=%.4f", ep + 1, epochs, tot / n)
-    return ae
-
-
-def _finetune(fc_tr, y_tr, fc_va, y_va, ae, n_rois, d_model, epochs, device, seed,
-              batch_size=32, lr=3e-4, weight_decay=1e-4, patience=15):
-    import torch
-    from sklearn.metrics import roc_auc_score
-    from models.connectome_transformer import ConnectomeTransformer
-    torch.manual_seed(seed)
-    clf = ConnectomeTransformer(n_rois=n_rois, d_model=d_model, n_heads=4,
-                                n_layers=2, dropout=0.3).to(device)
-    if ae is not None:                                  # transfer SSL-pretrained encoder
-        clf.embed.load_state_dict(ae.embed.state_dict())
-        clf.pos.data.copy_(ae.pos.data)
-        clf.encoder.load_state_dict(ae.encoder.state_dict())
-
-    opt = torch.optim.AdamW(clf.parameters(), lr=lr, weight_decay=weight_decay)
-    crit = torch.nn.CrossEntropyLoss()
-    Xtr = torch.tensor(fc_tr, dtype=torch.float32); ytr = torch.tensor(y_tr, dtype=torch.long)
-    Xva = torch.tensor(fc_va, dtype=torch.float32, device=device)
-    n = len(Xtr); best_auc, best_state, bad = -1.0, None, 0
-    for ep in range(epochs):
-        clf.train(); perm = torch.randperm(n)
-        for i in range(0, n, batch_size):
-            bi = perm[i:i + batch_size]
-            opt.zero_grad()
-            loss = crit(clf(Xtr[bi].to(device)), ytr[bi].to(device))
-            loss.backward(); opt.step()
-        clf.eval()
-        with torch.no_grad():
-            pv = torch.softmax(clf(Xva), dim=-1)[:, 1].cpu().numpy()
-        auc = roc_auc_score(y_va, pv) if len(set(y_va)) > 1 else 0.5
-        if auc > best_auc:
-            best_auc, bad = auc, 0
-            best_state = {k: v.detach().cpu().clone() for k, v in clf.state_dict().items()}
-        else:
-            bad += 1
-            if bad >= patience:
-                break
-    if best_state is not None:
-        clf.load_state_dict(best_state)
-    return clf, float(best_auc)
-
-
-def _predict(clf, fc, device):
-    import torch
-    clf.eval()
-    with torch.no_grad():
-        return torch.softmax(clf(torch.tensor(fc, dtype=torch.float32, device=device)),
-                             dim=-1)[:, 1].cpu().numpy()
-
-
-def _save_member(ckpt_dir, fold, atlas, seed_i, n_rois, d_model,
-                 clf, scaler, tangent_ref, val_auc, kind) -> dict:
-    """Export one ensemble member: model weights + the scaler + tangent reference
-    needed to featurize new data, plus metadata.  Enables full inference reload."""
-    import torch
-    ckpt_dir = Path(ckpt_dir); ckpt_dir.mkdir(parents=True, exist_ok=True)
-    name = f"fold{fold}_{atlas}_seed{seed_i}.pt"
-    payload = {
-        "model_state": {k: v.detach().cpu() for k, v in clf.state_dict().items()},
-        "arch": {"n_rois": int(n_rois), "d_model": int(d_model), "n_heads": 4, "n_layers": 2},
-        "scaler_mean": np.asarray(scaler.mean_, dtype=np.float32),
-        "scaler_scale": np.asarray(scaler.scale_, dtype=np.float32),
-        "tangent_reference": (tangent_ref.detach().cpu() if tangent_ref is not None else None),
-        "connectivity": kind, "atlas": atlas,
-        "fold": int(fold), "seed": int(seed_i), "val_auc": float(val_auc),
-    }
-    torch.save(payload, ckpt_dir / name)
-    return {"file": name, "fold": int(fold), "atlas": atlas,
-            "seed": int(seed_i), "val_auc": float(val_auc)}
-
-
 # ---------------------------------------------------------------------------
 # One protocol: nested CV with multi-atlas x seed ensemble
 # ---------------------------------------------------------------------------
 
 def run(ts_by_atlas, y, sites, atlases, protocol, n_folds, seed,
         ssl_epochs, epochs, seeds, kind, device, use_combat, ckpt_dir=None,
-        model="transformer", pheno=None):
+        model="transformer", pheno=None, recalibrate=False):
     from sklearn.preprocessing import StandardScaler
     from sklearn.model_selection import StratifiedKFold
 
@@ -287,30 +193,30 @@ def run(ts_by_atlas, y, sites, atlases, protocol, n_folds, seed,
             sc = StandardScaler().fit(Xtr)
             Xtr, Xte = sc.transform(Xtr), sc.transform(Xte)
             if use_combat:
-                Xtr, Xte = _combat_infold(Xtr, Xte, sites[tr], sites[te])
+                cov_tr = pheno[tr][:, :2] if pheno is not None else None   # age, sex
+                cov_te = pheno[te][:, :2] if pheno is not None else None
+                Xtr, Xte = _combat_infold(Xtr, Xte, sites[tr], sites[te], cov_tr, cov_te)
 
             if model == "logreg":
-                # Multi-atlas LINEAR ensemble member: in-fold nested C, one per atlas.
+                # Multi-atlas LINEAR ensemble member, one per atlas.
                 from sklearn.linear_model import LogisticRegression
-                from sklearn.model_selection import GridSearchCV
-                gs = GridSearchCV(
-                    LogisticRegression(solver="liblinear", max_iter=2000),
-                    {"C": [0.001, 0.01, 0.1, 1.0]}, scoring="roc_auc", cv=3, n_jobs=-1)
-                gs.fit(Xtr, y[tr])
-                member_probs.append(gs.predict_proba(Xte)[:, 1])
-            else:
-                inner = StratifiedKFold(n_splits=5, shuffle=True, random_state=seed)
-                itr, iva = next(inner.split(Xtr, y[tr]))
-                for s in range(seeds):
-                    ae = _pretrain_ssl(Xtr[itr], n_rois, 128, ssl_epochs, device, seed + s) \
-                        if ssl_epochs > 0 else None
-                    clf, mem_auc = _finetune(Xtr[itr], y[tr][itr], Xtr[iva], y[tr][iva],
-                                             ae, n_rois, 128, epochs, device, seed + s)
-                    member_probs.append(_predict(clf, Xte, device))
-                    if ckpt_dir is not None:
-                        ref = gpu_tan.reference_ if gpu_tan is not None else None
-                        members.append(_save_member(ckpt_dir, k, a, s, n_rois, 128,
-                                                    clf, sc, ref, mem_auc, kind))
+                if recalibrate:
+                    # in-fold Platt (sigmoid) recalibration; fixed C=0.01 (the value
+                    # selected in every prior nested-CV run) to keep the calibration
+                    # cross-validation affordable.
+                    from sklearn.calibration import CalibratedClassifierCV
+                    est = CalibratedClassifierCV(
+                        LogisticRegression(C=0.01, solver="liblinear", max_iter=2000),
+                        method="sigmoid", cv=3)
+                    est.fit(Xtr, y[tr])
+                    member_probs.append(est.predict_proba(Xte)[:, 1])
+                else:
+                    from sklearn.model_selection import GridSearchCV
+                    gs = GridSearchCV(
+                        LogisticRegression(solver="liblinear", max_iter=2000),
+                        {"C": [0.001, 0.01, 0.1, 1.0]}, scoring="roc_auc", cv=3, n_jobs=-1)
+                    gs.fit(Xtr, y[tr])
+                    member_probs.append(gs.predict_proba(Xte)[:, 1])
             logger.info("  fold %d/%d atlas=%s done", k + 1, len(splits), a)
 
         if pheno is not None:
@@ -322,10 +228,19 @@ def run(ts_by_atlas, y, sites, atlases, protocol, n_folds, seed,
             from sklearn.model_selection import GridSearchCV
             imp = SimpleImputer(strategy="median").fit(pheno[tr])
             psc = StandardScaler().fit(imp.transform(pheno[tr]))
-            pgs = GridSearchCV(LogisticRegression(max_iter=2000),
-                               {"C": [0.01, 0.1, 1.0, 10.0]}, scoring="roc_auc", cv=3, n_jobs=-1)
-            pgs.fit(psc.transform(imp.transform(pheno[tr])), y[tr])
-            member_probs.append(pgs.predict_proba(psc.transform(imp.transform(pheno[te])))[:, 1])
+            Ptr = psc.transform(imp.transform(pheno[tr]))
+            Pte = psc.transform(imp.transform(pheno[te]))
+            if recalibrate:
+                from sklearn.calibration import CalibratedClassifierCV
+                pclf = CalibratedClassifierCV(
+                    LogisticRegression(C=1.0, max_iter=2000), method="sigmoid", cv=3)
+                pclf.fit(Ptr, y[tr])
+                member_probs.append(pclf.predict_proba(Pte)[:, 1])
+            else:
+                pgs = GridSearchCV(LogisticRegression(max_iter=2000),
+                                   {"C": [0.01, 0.1, 1.0, 10.0]}, scoring="roc_auc", cv=3, n_jobs=-1)
+                pgs.fit(Ptr, y[tr])
+                member_probs.append(pgs.predict_proba(Pte)[:, 1])
 
         prob = np.mean(member_probs, axis=0)                 # ensemble
         oof_true.extend(y[te].tolist()); oof_prob.extend(prob.tolist())
@@ -358,20 +273,47 @@ def run(ts_by_atlas, y, sites, atlases, protocol, n_folds, seed,
     }
 
 
-def _combat_infold(Xtr, Xte, site_tr, site_te):
-    """In-fold ComBat harmonization (fit on train sites, apply to both)."""
+def _combat_infold(Xtr, Xte, site_tr, site_te, cov_tr=None, cov_te=None):
+    """In-fold, label-free ComBat site harmonization.
+
+    ComBat is fit jointly on the train and test *features* with site as the batch
+    variable, preserving age/sex as biological covariates so between-group signal
+    (ABIDE sites are class-imbalanced) is not removed. The diagnosis label is never
+    used, so there is no label leakage. Fitting jointly (transductively) also lets us
+    harmonize a leave-one-site-out held-out site, whose parameters are estimated from
+    its own unlabelled features — the only way to correct a site unseen in training.
+    Any failure (e.g. a degenerate batch) falls back to the unharmonized features.
+    """
     try:
         from neuroCombat import neuroCombat
+        import pandas as pd
+        import contextlib, io
     except Exception:
         logger.warning("neuroCombat not installed — skipping ComBat")
         return Xtr, Xte
-    import pandas as pd
-    # neuroCombat expects features x samples
-    all_X = np.vstack([Xtr, Xte]).T
+
+    all_X = np.vstack([Xtr, Xte]).T                      # features x samples
     batch = np.concatenate([site_tr, site_te])
-    covars = pd.DataFrame({"batch": batch})
-    out = neuroCombat(dat=all_X, covars=covars, batch_col="batch")["data"].T
-    return out[:len(Xtr)], out[len(Xtr):]
+    covdict = {"batch": batch}
+    cont, cat = [], []
+    if cov_tr is not None and cov_te is not None:
+        cov = np.vstack([cov_tr, cov_te]).astype(float)  # (n, 2): age, sex
+        age_med = np.nanmedian(cov_tr[:, 0]) if np.isfinite(cov_tr[:, 0]).any() else 0.0
+        age = np.where(np.isfinite(cov[:, 0]), cov[:, 0], age_med)
+        sex = np.where(np.isfinite(cov[:, 1]), cov[:, 1], 0).astype(int)
+        covdict["age"] = age; covdict["sex"] = sex
+        cont, cat = ["age"], ["sex"]
+    covars = pd.DataFrame(covdict)
+    try:
+        with contextlib.redirect_stdout(io.StringIO()):    # silence neuroCombat prints
+            out = neuroCombat(dat=all_X, covars=covars, batch_col="batch",
+                              continuous_cols=cont, categorical_cols=cat)["data"].T
+        if not np.all(np.isfinite(out)):
+            raise ValueError("non-finite output")
+        return out[:len(Xtr)], out[len(Xtr):]
+    except Exception as e:
+        logger.warning("ComBat failed on fold (%s) — using unharmonized features", e)
+        return Xtr, Xte
 
 
 def main() -> None:
@@ -381,8 +323,10 @@ def main() -> None:
     p.add_argument("--atlases", nargs="+", default=["cc200", "aal", "ho"],
                    choices=list(ATLAS_INFO.keys()))
     p.add_argument("--kind", default="tangent", choices=["tangent", "correlation"])
-    p.add_argument("--model", default="transformer", choices=["transformer", "logreg"],
-                   help="logreg = multi-atlas linear tangent-FC ensemble (strong baseline)")
+    p.add_argument("--model", default="logreg", choices=["logreg"],
+                   help="multi-atlas linear tangent-FC ensemble. The transformer path was "
+                        "removed: at n=871 with ~20k features it never approached the linear "
+                        "baseline, and it cannot be trained on the hardware this study uses.")
     p.add_argument("--phenotype", action="store_true",
                    help="add a phenotype late-fusion ensemble member (age/sex/IQ/handedness)")
     p.add_argument("--protocol", default="pooled", choices=["pooled", "loso", "both"])
@@ -390,7 +334,9 @@ def main() -> None:
     p.add_argument("--ssl_epochs", type=int, default=100, help="0 = no SSL pretraining")
     p.add_argument("--epochs", type=int, default=200)
     p.add_argument("--seeds", type=int, default=1, help="ensemble members per atlas")
-    p.add_argument("--combat", action="store_true", help="in-fold ComBat harmonization")
+    p.add_argument("--combat", action="store_true", help="in-fold ComBat site harmonization")
+    p.add_argument("--recalibrate", action="store_true",
+                   help="in-fold Platt (sigmoid) recalibration of member probabilities")
     p.add_argument("--device", default="cuda")
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--out_dir", default="results")
@@ -418,7 +364,8 @@ def main() -> None:
         logger.info("=== multi-atlas SSL ensemble | %s | atlases=%s ===", proto, args.atlases)
         res = run(ts_by_atlas, y, sites, args.atlases, proto, args.n_folds, args.seed,
                   args.ssl_epochs, args.epochs, args.seeds, args.kind, args.device, args.combat,
-                  ckpt_dir=out / "checkpoints" / proto, model=args.model, pheno=pheno)
+                  ckpt_dir=out / "checkpoints" / proto, model=args.model, pheno=pheno,
+                  recalibrate=args.recalibrate)
         results.append(res)
         m, s = res["fold_mean"], res["fold_std"]
         logger.info("  >>> %s: AUROC %.3f+/-%.3f  acc %.3f+/-%.3f  sens %.3f spec %.3f",

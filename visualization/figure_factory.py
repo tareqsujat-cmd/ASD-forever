@@ -193,58 +193,6 @@ class FigureFactory:
     # MRI saliency
     # ------------------------------------------------------------------
 
-    def mri_saliency(
-        self,
-        volume: np.ndarray,
-        saliency: Optional[np.ndarray] = None,
-        title: str = "GradCAM Saliency",
-        filename: Optional[str] = None,
-        **kwargs,
-    ) -> plt.Figure:
-        from visualization.mri_saliency import plot_mri_triplet
-        fig = plot_mri_triplet(volume, saliency, title=title, **kwargs)
-        if filename:
-            self.save(fig, filename)
-        return fig
-
-    # ------------------------------------------------------------------
-    # Gene importance
-    # ------------------------------------------------------------------
-
-    def gene_importance(
-        self,
-        importances: Union[np.ndarray, Dict],
-        gene_names: Optional[Sequence[str]] = None,
-        top_k: int = 20,
-        method_label: str = "Importance",
-        filename: Optional[str] = None,
-    ) -> plt.Figure:
-        from visualization.genetics_importance import plot_gene_importance
-        fig = plot_gene_importance(
-            importances, gene_names=gene_names,
-            top_k=top_k, method_label=method_label
-        )
-        if filename:
-            self.save(fig, filename)
-        return fig
-
-    def attention_heatmap(
-        self,
-        attn_matrix: np.ndarray,
-        token_labels: Optional[Sequence[str]] = None,
-        filename: Optional[str] = None,
-        **kwargs,
-    ) -> plt.Figure:
-        from visualization.genetics_importance import plot_attention_heatmap
-        fig = plot_attention_heatmap(attn_matrix, token_labels=token_labels, **kwargs)
-        if filename:
-            self.save(fig, filename)
-        return fig
-
-    # ------------------------------------------------------------------
-    # Summary panel (multi-panel paper figure)
-    # ------------------------------------------------------------------
-
     def summary_panel(
         self,
         y_true: np.ndarray,
@@ -335,14 +283,6 @@ class FigureFactory:
                 except Exception as e:
                     logger.warning("Embedding panel failed: %s", e)
                     axes[panel_idx].axis("off")
-                panel_idx += 1
-
-            # --- (f) Gene importance (optional) ---
-            if gene_importances is not None:
-                from visualization.genetics_importance import plot_gene_importance
-                plot_gene_importance(gene_importances, gene_names=gene_names,
-                                     top_k=10, ax=axes[panel_idx])
-                axes[panel_idx].set_title("(f) Gene Importance")
                 panel_idx += 1
 
             # Hide unused axes

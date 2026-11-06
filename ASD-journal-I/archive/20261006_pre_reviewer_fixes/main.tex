@@ -1,0 +1,128 @@
+\documentclass[a4paper,fleqn]{cas-sc}
+\usepackage{soul}
+\newcommand{\reviewhl}[1]{\begingroup\sethlcolor{yellow}\hl{#1}\endgroup}
+% text added or changed in the calibration and interpretation edit (2026-10-01); to remove the marking, replace \addhl{X} by X
+\newcommand{\addhl}[1]{\begingroup\sethlcolor{green!30}\hl{#1}\endgroup}
+% fallback for the author's \hlblue notes; has no effect where \hlblue is already defined
+\providecommand{\hlblue}[1]{\begingroup\sethlcolor{cyan!30}\hl{#1}\endgroup}
+\newcommand{\ding}[1]{\textcircled{\scriptsize\the\numexpr#1-201\relax}}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\graphicspath{{figures/}}
+\usepackage{booktabs}
+% hyperref is loaded by cas-sc.cls; loading it again with options clashes
+\hypersetup{colorlinks=true, linkcolor=blue, citecolor=blue, urlcolor=blue}
+
+\begin{document}
+\let\WriteBookmarks\relax
+\def\floatpagepagefraction{1}
+\def\textpagefraction{.001}
+
+\shortauthors{R. U. Karim et al.}
+
+\title[mode=title]{Beyond Discrimination: Toward Trustworthy Autism Classification from Resting-State Functional Connectomes through Calibration and Interpretable Modeling}
+
+\author[1]{Reshad Ul Karim}
+% \cormark[1]
+\ead{reshad.sazid@gmail.com}
+\credit{Conceptualization, Methodology, Software, Formal analysis, Writing -- original draft}
+
+\author[1]{Syeda Maliha Tabassum}
+\ead{syedamalihatabassum19@gmail.com}
+\author[1]{Mehreen Mallick Fiona}
+\ead{mehreen.mallick.fiona@g.bracu.ac.bd}
+\author[1]{Tareq Sujat}
+\ead{tareq.sujat@g.bracu.ac.bd}
+
+\author[1]{Rakin Bin Rabbani}
+\ead{rakin.rabbani@bracu.ac.bd}
+
+\author[2]{Aniqua Nusrat Zereen}
+\cormark[1]
+\ead{aniqua.zer@mahidol.ac.th}
+
+% CRediT roles: fill in \credit{...} under each author before submission.
+% Author 1 is filled in; the remaining five are left for the authors to complete.
+
+\affiliation[1]{organization={Department of Computer Science and Engineering, BRAC University},
+            city={Dhaka},
+            country={Bangladesh}}
+
+\affiliation[2]{organization={Faculty of Information and Communication Technology, Mahidol University},
+            city={Salaya},
+            country={Thailand}}
+
+\cortext[1]{Corresponding author}
+
+\begin{abstract}
+Autism classification from resting-state brain connectomes is often judged by how well models distinguish autistic from non-autistic participants, although performance can also depend on cohort composition, motion, regularisation, calibration, and model-explanation stability. These issues are examined using a controlled functional-connectivity framework that evaluates predictive performance, probability reliability, group effects, and reproducibility of interpretation. fMRI data from 871 participants in the Autism Brain Imaging Data Exchange I (ABIDE-I) are represented using correlation, static tangent-space, and windowed tangent-space connectivity within the same framework. Performance is evaluated under pooled and site-held-out validation, followed by targeted analyses of model reliability and interpretation. Participant-pooled AUROCs of 0.776 and 0.774 are obtained under pooled and leave-one-site-out validation, respectively. Performance also varies with cognitive ability: AUROC decreases from 0.873 to 0.719 across increasing full-scale IQ bands in autistic participants, while no symptom association survives correction within the autistic group. Lower somatomotor connectivity remains evident and strengthens after within-site motion matching. Linear models achieve AUROCs of 0.735--0.757, compared with 0.611--0.624 for fixed-configuration tree ensembles. The small apparent advantage of windowed connectivity disappears when the static representation receives comparable covariance regularisation. Training-only recalibration reduces calibration-in-the-large from -0.162 to -0.010 without changing discrimination. System-level attribution is dominated by default-mode pairs and reproduces across independent cohort halves, whereas single-connection patterns are less stable. Overall, reliable connectome-based autism classification requires performance to be interpreted alongside calibration, cohort characteristics, analytical design, and reproducibility of model explanations.
+\end{abstract}
+
+\begin{graphicalabstract}
+\includegraphics[width=\linewidth]{fig_graphical_abstract}
+\end{graphicalabstract}
+
+\begin{highlights}
+\item Recalibration inside training folds restores calibration-in-the-large
+\item Exact system-level attribution replicates across independent halves of the cohort
+\item Somatomotor hypoconnectivity survives motion matching; default mode leads the score
+\item Detection falls with IQ, and scores separate groups without tracking severity
+\item Regularised linear models beat fixed trees; windowed gains reflect shrinkage
+\end{highlights}
+
+\begin{keywords}
+Autism spectrum disorder \sep Functional connectome \sep Resting-state fMRI \sep Bioinformatics \sep Calibration \sep Interpretability
+\end{keywords}
+
+\maketitle   
+
+\input{sections/introduction}
+\input{sections/related_work}
+\input{sections/method}
+\input{sections/result}
+\input{sections/discussion}
+\input{sections/conclusion}
+
+\section*{Data availability}
+This study analyses the Autism Brain Imaging Data Exchange I (ABIDE-I), which is publicly available through
+the ABIDE Preprocessed Initiative \cite{ABIDE_preprocessed_dataset}. The regional time series used here are the
+C-PAC \texttt{filt\_noglobal} derivatives distributed with that release, together with the accompanying phenotypic
+table. No new data were collected. Access is governed by the ABIDE data-use terms, and no participant-level data are
+redistributed with this article. The participant identifiers of the analysed cohorts, the fold assignments, and the derived
+result tables are provided so that every reported value can be traced to its source.
+
+\section*{Code availability}
+The analysis code, the configuration files, and the stored result tables that generate every
+table and figure in this article are available from the corresponding author on request and are
+being prepared for deposit in a public repository with an archived release, subject to the
+ABIDE data-use terms.
+
+\section*{Ethics approval and consent}
+This study is a secondary analysis of a de-identified, publicly available dataset. Ethical
+approval and informed consent were obtained by the contributing sites of the ABIDE-I
+consortium under their own institutional review boards, as described in the ABIDE-I data
+descriptor. No additional ethical approval was required for the present analysis, and the
+authors had no contact with participants.
+
+\section*{Funding}
+This research received no specific grant from any funding agency in the public, commercial, or
+not-for-profit sectors.
+
+\section*{Declaration of competing interest}
+The authors declare that they have no known competing financial interests or personal
+relationships that could have appeared to influence the work reported in this article.
+
+\section*{Acknowledgements}
+The authors thank the ABIDE-I consortium and the ABIDE Preprocessed Initiative for collecting,
+preprocessing, and openly sharing the data analysed here.
+
+\section*{Declaration of generative AI in the writing process}
+
+During the preparation of this work, the authors used ChatGPT and Claude as a general-purpose assistant to polish text that had already been drafted by the authors, including grammar, phrasing, and formatting, and to assist with routine coding tasks such as plotting scripts and refactoring experiment harnesses. ChatGPT was not used for research ideation, deriving or checking theoretical results, generating experimental results or data, or retrieving and summarizing related work. After using ChatGPT, the authors reviewed and edited all AI-assisted text and code as needed and take full responsibility for the content of the published article. All numerical results reported in this work were generated from the code run by the authors.
+
+% Elsevier numbered style: references numbered in order of first appearance.
+% The "-names" variant keeps author names in the .bbl, which \citet needs.
+\bibliographystyle{elsarticle-num-names}
+\bibliography{references}
+\end{document}
